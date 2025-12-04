@@ -235,67 +235,49 @@ export default function PMExecutionPage({
 
   // 🔁 Nuevo handleFinish usando FormData (payload + fotos)
   const handleFinish = async () => {
-    if (!pmTemplate) return;
-    if (!canFinish) return;
+  if (!pmTemplate) return;
+  if (!canFinish) return;
 
-    try {
-      setFinishing(true);
-      setError(null);
-      const now = new Date().toISOString();
-      setFinishedAt(now);
+  try {
+    setFinishing(true);
+    setError(null);
+    const now = new Date().toISOString();
+    setFinishedAt(now);
 
-      const payload = {
-        pmTemplateId: pmTemplate.id,
-        pmNumber: pmTemplate.pmNumber,
-        pmName: pmTemplate.name,
-        asociado1: asociado1 || "SIN NOMBRE",
-        asociado2: asociado2 || "",
-        glNombre: glNombre || "SIN GL",
-        startedAt: startedAt || now,
-        finishedAt: now,
-        tasks: tasksExec,
-      };
+    const body = {
+      pmTemplateId: pmTemplate.id,
+      pmNumber: pmTemplate.pmNumber,
+      pmName: pmTemplate.name,
+      asociado1: asociado1 || "SIN NOMBRE",
+      asociado2: asociado2 || "",
+      glNombre: glNombre || "SIN GL",
+      startedAt: startedAt || now,
+      finishedAt: now,
+      tasks: tasksExec,
+    };
 
-      const formData = new FormData();
-      // 1) JSON con todo lo que ya mandabas antes
-      formData.append("payload", JSON.stringify(payload));
+    const res = await fetch("/api/pm-finish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body), // 👈 IMPORTANTE: aquí va JSON, NO formData
+    });
 
-      // 2) Fotos por taskId
-      Object.entries(photosByTask).forEach(([taskId, file]) => {
-        if (file) {
-          formData.append(`photo_${taskId}`, file);
-        }
-      });
-
-      const res = await fetch("/api/pm-finish", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Error finish:", text);
-        throw new Error("Error al generar el PDF.");
-      }
-
-      const data = await res.json();
-      if (!data?.url) throw new Error("La respuesta no incluye la URL del PDF.");
-      window.open(data.url, "_blank");
-    } catch (e: any) {
-      console.error(e);
-      setError(e?.message || "No se pudo generar el PDF. Intenta de nuevo.");
-    } finally {
-      setFinishing(false);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Error finish:", text);
+      throw new Error("Error al generar el PDF.");
     }
-  };
 
-  if (loading || !pmTemplate) {
-    return (
-      <div className="pm-page pm-page--loading">
-        <div className="pm-loading-card">Cargando PM...</div>
-      </div>
-    );
+    const data = await res.json();
+    if (!data?.url) throw new Error("La respuesta no incluye la URL del PDF.");
+    window.open(data.url, "_blank");
+  } catch (e: any) {
+    console.error(e);
+    setError(e?.message || "No se pudo generar el PDF. Intenta de nuevo.");
+  } finally {
+    setFinishing(false);
   }
+};
 
   const pdfUrl: string | null = pmTemplate.basePdfUrl ?? null;
 
