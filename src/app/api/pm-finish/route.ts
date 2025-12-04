@@ -29,47 +29,27 @@ type FinishBody = {
 
 export const runtime = "nodejs";
 
-// 🔧 Limpia el texto para que WinAnsi (Helvetica estándar) lo pueda dibujar
+// 🔧 Limpia el texto para que Helvetica estándar lo pueda dibujar
 function sanitizeForPdf(text: string | null | undefined): string {
   if (!text) return "";
   return text
-    .normalize("NFD") // separa letras y acentos
-    .replace(/[\u0300-\u036f]/g, "") // quita acentos combinantes
-    .replace(/[^\x00-\x7F]/g, ""); // quita caracteres fuera de ASCII básico
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x00-\x7F]/g, "");
 }
 
-// 🔧 Limpia texto para usarlo en EL NOMBRE DEL ARCHIVO (sin espacios raros)
+// 🔧 Limpia texto para usarlo en EL NOMBRE DEL ARCHIVO
 function sanitizeForFileName(text: string | null | undefined): string {
   if (!text) return "";
   return text
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // quitar acentos
-    .replace(/[^\w.-]+/g, "_"); // solo letras, numeros, _, . y -
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w.-]+/g, "_");
 }
 
 export async function POST(req: Request) {
   try {
-    // ============================================================
-    // 1) SOPORTE PARA JSON (actual) Y multipart/form-data (futuro)
-    // ============================================================
-    const contentType = req.headers.get("content-type") || "";
-    let body: FinishBody;
-    let formData: FormData | null = null;
-
-    if (contentType.includes("multipart/form-data")) {
-      formData = await req.formData();
-      const rawPayload = formData.get("payload");
-      if (!rawPayload || typeof rawPayload !== "string") {
-        return NextResponse.json(
-          { error: "Falta payload o formato inválido" },
-          { status: 400 }
-        );
-      }
-      body = JSON.parse(rawPayload) as FinishBody;
-    } else {
-      // 👉 modo actual: el frontend manda JSON
-      body = (await req.json()) as FinishBody;
-    }
+    const body = (await req.json()) as FinishBody;
 
     const {
       pmTemplateId,
@@ -83,9 +63,9 @@ export async function POST(req: Request) {
       tasks,
     } = body;
 
-    // =========================
-    // 2) Validaciones básicas
-    // =========================
+    // ==========================
+    // Validaciones básicas
+    // ==========================
     if (!pmTemplateId) {
       return NextResponse.json(
         { error: "Falta pmTemplateId" },
@@ -114,6 +94,9 @@ export async function POST(req: Request) {
       );
     }
 
+    // ==========================
+    // Cargar plantilla desde Prisma
+    // ==========================
     const template = await prisma.pMTemplate.findUnique({
       where: { id: pmTemplateId },
       include: { tasks: true, uploadedFile: true },
@@ -126,12 +109,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Mapa para encontrar rápido cada task del template
-    const taskMap = new Map<string, (typeof template.tasks)[number]>(
-      template.tasks.map((t) => [t.id, t])
+    // 👇 hacemos el mapa tipado como any para que TS no diga "unknown"
+    const taskMap = new Map<string, any>(
+      template.tasks.map((t) => [t.id, t as any])
     );
 
-    // Validar que todas las tasks que vienen del front existan en el template
+    // Validar que todas las tareas existan
     for (const t of tasks) {
       if (!taskMap.has(t.taskId)) {
         return NextResponse.json(
@@ -145,9 +128,9 @@ export async function POST(req: Request) {
     const finishedDate = new Date(finishedAt);
     const durationMs = finishedDate.getTime() - startedDate.getTime();
 
-    // =========================
-    // 3) Crear ejecución
-    // =========================
+    // ==========================
+    // Crear ejecución (PMExecution)
+    // ==========================
     const execution = (await prisma.pMExecution.create({
       data: {
         pmTemplateId: template.id,
@@ -158,9 +141,9 @@ export async function POST(req: Request) {
         finishedAt: finishedDate,
         durationMs,
       },
-    })) as any; // 👈 cast para que TypeScript no marque unknown
+    })) as any; // 👈 cast para que TS sepa que tiene "id"
 
-    // Marcar el PM como COMPLETED a nivel PMUploadedFile
+    // Marcar PMUploadedFile como COMPLETED (si existe relación)
     if (template.uploadedFileId) {
       await prisma.pMUploadedFile.update({
         where: { id: template.uploadedFileId },
@@ -170,10 +153,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // Crear las líneas de ejecución de tareas (PMTaskExecution)
+    // Crear ejecuciones por tarea
     await prisma.pMTaskExecution.createMany({
       data: tasks.map((t) => {
-        const tmplTask = taskMap.get(t.taskId)!;
+        const tmplTask = taskMap.get(t.taskId) as any;
         return {
           pmExecutionId: execution.id,
           templateTaskId: tmplTask.id,
@@ -181,56 +164,16 @@ export async function POST(req: Request) {
           comment: t.comment || "",
           flagged: t.flagged,
           measureValue: t.measureValue || null,
-          // photoUrl se llenará después si hay foto
         };
       }),
     });
 
-    // =========================
-    // 4) Si viene multipart/form-data,
-    //    subimos fotos y guardamos photoUrl
-    // =========================
-    if (formData) {
-      const executionWithTasks = (await prisma.pMExecution.findUnique({
-        where: { id: execution.id },
-        include: { taskExecutions: true },
-      })) as any;
-
-      if (executionWithTasks && executionWithTasks.taskExecutions) {
-        for (const taskExec of executionWithTasks.taskExecutions as any[]) {
-          const key = `photo_${taskExec.templateTaskId}`;
-          const file = formData.get(key);
-
-          if (!file || typeof file === "string") continue;
-
-          const extFromName =
-            (file as File).name?.split(".").pop() || "jpg";
-
-          const blob = await put(
-            `pm-photos/${execution.id}-${taskExec.templateTaskId}-${Date.now()}.${extFromName}`,
-            file as any,
-            { access: "public" }
-          );
-
-          await prisma.pMTaskExecution.update({
-            where: { id: taskExec.id },
-            data: {
-              photoUrl: blob.url,
-            },
-          });
-        }
-      }
-    }
-
-    // ==========================================
-    // 5) Generar PDF de ejecución
-    // ==========================================
-
+    // ==========================
+    // GENERAR PDF
+    // ==========================
     const pdfDoc = await PDFDocument.create();
-    // A4 horizontal aprox: 842 x 595
-    const page = pdfDoc.addPage([842, 595]);
+    const page = pdfDoc.addPage([842, 595]); // A4 horizontal
     const { width, height } = page.getSize();
-
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
     const margin = 40;
@@ -269,13 +212,13 @@ export async function POST(req: Request) {
       y -= fontSize + 4;
     };
 
-    // -------- Resumen de estados para el encabezado --------
+    // Resumen de estados
     const total = tasks.length;
     const okCount = tasks.filter((t) => t.status === "ok").length;
     const nokCount = tasks.filter((t) => t.status === "nok").length;
     const flaggedCount = tasks.filter((t) => t.flagged).length;
 
-    // -------- Encabezado general --------
+    // Encabezado
     drawText("TOYOTA - PM EXECUTION REPORT", 16);
     drawText("");
 
@@ -303,14 +246,13 @@ export async function POST(req: Request) {
     );
     drawText("");
 
-    // -------- “Tarjetitas” de resumen --------
+    // Tarjetas de resumen
     const summaryHeight = 40;
-    const boxWidth = (width - 2 * margin - 20) / 3; // 3 cajas + espacios
+    const boxWidth = (width - 2 * margin - 20) / 3;
     const summaryY = y;
-
     const pageCurrent = getCurrentPage();
 
-    // OK (verde)
+    // OK
     pageCurrent.drawRectangle({
       x: margin,
       y: summaryY - summaryHeight,
@@ -333,7 +275,7 @@ export async function POST(req: Request) {
       color: rgb(0, 0.4, 0),
     });
 
-    // NO OK (rojo)
+    // NO OK
     pageCurrent.drawRectangle({
       x: margin + boxWidth + 10,
       y: summaryY - summaryHeight,
@@ -356,7 +298,7 @@ export async function POST(req: Request) {
       color: rgb(0.5, 0, 0),
     });
 
-    // Revisión (Flag / naranja)
+    // FLAGS
     pageCurrent.drawRectangle({
       x: margin + 2 * (boxWidth + 10),
       y: summaryY - summaryHeight,
@@ -380,12 +322,11 @@ export async function POST(req: Request) {
     });
 
     y = summaryY - summaryHeight - 16;
-
-    drawText(""); // espacio
+    drawText("");
     drawText("Detalle por punto:", 12);
     drawText("");
 
-    // -------- Función para dibujar el CUADRO completo de un punto --------
+    // Función para dibujar cada “tarjeta” de punto
     const drawTaskBox = (
       tmplTask: {
         taskIdNumber: number;
@@ -400,7 +341,6 @@ export async function POST(req: Request) {
       const lineGap = 4;
       const padding = 6;
 
-      // Contar cuántas líneas vamos a dibujar
       let lines = 1; // encabezado
       if (tmplTask.keyPoints) lines++;
       if (tmplTask.reason) lines++;
@@ -414,22 +354,17 @@ export async function POST(req: Request) {
         headerLineHeight + (lines - 1) * bodyLineHeight;
       const boxHeight = contentHeight + padding * 2;
 
-      // Aseguramos espacio para TODO el cuadro
       ensureSpace(boxHeight + 8);
 
       const page = getCurrentPage();
-
-      // Color del borde según estado
-      // OK → verde, NO OK → rojo, Flag → naranja
-      let borderColor = rgb(0.6, 0.6, 0.6); // gris por defecto
-      if (exec.status === "ok") borderColor = rgb(0, 0.6, 0);
-      if (exec.status === "nok") borderColor = rgb(0.8, 0, 0);
-      if (exec.flagged) borderColor = rgb(0.9, 0.4, 0); // revisión manda
-
       const boxTopY = y;
       const boxBottomY = y - boxHeight;
 
-      // Dibujar cuadro (fondo blanco, solo borde de color)
+      let borderColor = rgb(0.6, 0.6, 0.6);
+      if (exec.status === "ok") borderColor = rgb(0, 0.6, 0);
+      if (exec.status === "nok") borderColor = rgb(0.8, 0, 0);
+      if (exec.flagged) borderColor = rgb(0.9, 0.4, 0);
+
       page.drawRectangle({
         x: margin - 4,
         y: boxBottomY,
@@ -440,7 +375,6 @@ export async function POST(req: Request) {
         borderWidth: 1.5,
       });
 
-      // “Icono” según estado
       let icon = "[ ]";
       if (exec.flagged) icon = "[!]";
       else if (exec.status === "ok") icon = "[O]";
@@ -459,7 +393,6 @@ export async function POST(req: Request) {
         ? `[${tmplTask.taskIdNumber}] ${icon} ${tmplTask.majorStep}  [${statusLabel} · NECESITA REVISION]`
         : `[${tmplTask.taskIdNumber}] ${icon} ${tmplTask.majorStep}  [${statusLabel}]`;
 
-      // Dibujar texto dentro del cuadro
       let textY = boxTopY - padding - headerFontSize;
 
       page.drawText(sanitizeForPdf(headerLabel), {
@@ -530,9 +463,7 @@ export async function POST(req: Request) {
 
       if (exec.flagged) {
         page.drawText(
-          sanitizeForPdf(
-            "FLAG: Requiere revision del GL / Mtto"
-          ),
+          sanitizeForPdf("FLAG: Requiere revision del GL / Mtto"),
           {
             x: margin,
             y: textY,
@@ -544,11 +475,10 @@ export async function POST(req: Request) {
         textY -= bodyLineHeight;
       }
 
-      // Actualizar y global dejando un espacio entre tarjetas
       y = boxBottomY - 8;
     };
 
-    // -------- Lista de tareas (cada una como tarjeta completa) --------
+    // Dibujar todas las tareas
     for (const t of tasks) {
       const tmplTask = taskMap.get(t.taskId) as any;
       drawTaskBox(
@@ -565,10 +495,9 @@ export async function POST(req: Request) {
     const pdfBytes = await pdfDoc.save();
     const pdfBuffer = Buffer.from(pdfBytes);
 
-    // ============================
-    // NOMBRE DEL ARCHIVO PDF FINAL
-    // ============================
-    // EXEC_(NOMBRE DEL ARCHIVO ORIGINAL)_GL(GL)_A1(A1)_A2(A2).pdf
+    // ==========================
+    // NOMBRE DEL ARCHIVO
+    // ==========================
     const originalFileName =
       template.uploadedFile?.fileName ??
       template.pmNumber ??
@@ -576,7 +505,6 @@ export async function POST(req: Request) {
       "PM";
 
     const originalBase = originalFileName.replace(/\.[^/.]+$/, "");
-
     const safeOriginal = sanitizeForFileName(originalBase);
     const safeGL = sanitizeForFileName(glNombre);
     const safeA1 = sanitizeForFileName(asociado1);
@@ -587,24 +515,45 @@ export async function POST(req: Request) {
       (safeA2 ? `_A2(${safeA2})` : "") +
       `.pdf`;
 
-    const { url } = await put(blobName, pdfBuffer, {
-      access: "public",
-      contentType: "application/pdf",
-    });
+    // ==========================
+    // SUBIR A BLOB
+    // ==========================
+    let url: string;
+    try {
+      const { url: blobUrl } = await put(blobName, pdfBuffer, {
+        access: "public",
+        contentType: "application/pdf",
+      });
+      url = blobUrl;
+    } catch (blobErr: any) {
+      console.error("Error subiendo PDF a Blob:", blobErr);
+      return NextResponse.json(
+        {
+          error:
+            "Se creó la ejecución pero falló al subir el PDF al Blob. Revisa BLOB_READ_WRITE_TOKEN.",
+          details: blobErr?.message || String(blobErr),
+        },
+        { status: 500 }
+      );
+    }
 
-    const exec = await prisma.pMExecution.update({
+    // Guardar URL en la ejecución
+    const execUpdated = (await prisma.pMExecution.update({
       where: { id: execution.id },
       data: {
         executionPdfUrl: url,
       },
-    });
+    })) as any;
 
-    return NextResponse.json({ ok: true, url, executionId: exec.id });
-  } catch (err) {
+    return NextResponse.json({ ok: true, url, executionId: execUpdated.id });
+  } catch (err: any) {
     console.error("Error en /api/pm-finish:", err);
     return NextResponse.json(
-      { error: "No se pudo generar el PDF" },
-      { status: 400 }
+      {
+        error: "No se pudo generar el PDF",
+        details: err?.message || String(err),
+      },
+      { status: 500 }
     );
   }
 }
