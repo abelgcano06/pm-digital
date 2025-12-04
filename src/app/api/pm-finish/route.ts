@@ -49,7 +49,24 @@ function sanitizeForFileName(text: string | null | undefined): string {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as FinishBody;
+    // 🧪 1) Leer el cuerpo crudo
+    const rawBody = await req.text();
+
+    let body: FinishBody;
+    try {
+      // 🧪 2) Intentar parsear como JSON
+      body = JSON.parse(rawBody) as FinishBody;
+    } catch (parseErr: any) {
+      console.error("pm-finish: body NO es JSON válido:", rawBody);
+      return NextResponse.json(
+        {
+          error: "El cuerpo recibido no es JSON válido",
+          details: parseErr?.message || String(parseErr),
+          rawSample: rawBody.slice(0, 300), // máx 300 chars para ver qué llegó
+        },
+        { status: 400 }
+      );
+    }
 
     const {
       pmTemplateId,
@@ -62,6 +79,7 @@ export async function POST(req: Request) {
       finishedAt,
       tasks,
     } = body;
+
 
     // ==========================
     // Validaciones básicas
