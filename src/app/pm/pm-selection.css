@@ -1,0 +1,431 @@
+/* ======== PÁGINA DE SELECCIÓN DE PM (AZUL #5B8DEF) ======== */
+
+.baja-pm-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, #e0f3ff 0, #f5fbff 40%, #ffffff 100%);
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #142033;
+}
+
+.baja-pm-shell {
+  width: 100%;
+  max-width: 1200px;
+}
+
+/* HEADER SUPERIOR */
+
+.baja-pm-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 18px;
+}
+
+.baja-pm-header-main {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 14px 40px rgba(26, 88, 181, 0.16);
+  border: 1px solid rgba(91, 141, 239, 0.25);
+}
+
+.baja-pm-app-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(91, 141, 239, 0.08);
+  border: 1px solid rgba(91, 141, 239, 0.2);
+  font-size: 11px;
+  color: #304d7e;
+  margin-bottom: 6px;
+}
+
+.baja-pm-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #27446f;
+}
+
+.baja-pm-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #6b7b97;
+}
+
+.baja-pm-meta {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: #7a89a5;
+}
+
+.baja-pm-meta-time {
+  font-weight: 500;
+}
+
+.baja-pm-meta-status {
+  color: #1b8643;
+  font-weight: 600;
+}
+
+.baja-pm-header-badge {
+  width: 260px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 12px 14px;
+  box-shadow: 0 14px 40px rgba(26, 88, 181, 0.16);
+  border: 1px solid rgba(91, 141, 239, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.baja-pm-badge-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #27446f;
+}
+
+.baja-pm-badge-text {
+  font-size: 12px;
+  color: #6b7b97;
+}
+
+/* GRID PRINCIPAL (EQUIPO / LISTA DE PMS) */
+
+.baja-pm-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.5fr);
+  gap: 16px;
+}
+
+.baja-pm-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 18px;
+  box-shadow: 0 14px 40px rgba(26, 88, 181, 0.16);
+  border: 1px solid rgba(91, 141, 239, 0.25);
+}
+
+.baja-pm-card-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.baja-pm-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #5b8def, #88b3ff);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(63, 111, 206, 0.4);
+}
+
+.baja-pm-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #27446f;
+}
+
+.baja-pm-card-help {
+  font-size: 12px;
+  color: #6b7b97;
+}
+
+.baja-pm-card-header-right {
+  align-items: center;
+}
+
+.baja-pm-loading-tag {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f1f5ff;
+  color: #34528d;
+  border: 1px solid #d1e1ff;
+}
+
+/* FORM EQUIPO (IZQUIERDA) */
+
+.baja-pm-team-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.baja-pm-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.baja-pm-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374c70;
+}
+
+.baja-pm-label-required {
+  color: #c53a3a;
+}
+
+.baja-pm-input {
+  border-radius: 999px;
+  border: 1px solid #d1e1ff;
+  padding: 7px 12px;
+  font-size: 13px;
+  outline: none;
+  background: #f7fbff;
+  color: #142033;
+}
+
+.baja-pm-input:focus {
+  border-color: #5b8def;
+  box-shadow: 0 0 0 1px rgba(91, 141, 239, 0.4);
+  background: #ffffff;
+}
+
+/* ALERTAS */
+
+.baja-pm-alert {
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.baja-pm-alert-error {
+  background: #ffe5e7;
+  color: #a1242b;
+  border: 1px solid #f3b4b7;
+}
+
+.baja-pm-alert-warning {
+  background: #fff5dd;
+  color: #8b6716;
+  border: 1px solid #f0d193;
+}
+
+/* BOTONES */
+
+.baja-pm-button {
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+  transition: transform 0.05s ease, box-shadow 0.1s ease, opacity 0.1s ease;
+}
+
+.baja-pm-button-primary {
+  background: linear-gradient(135deg, #5b8def, #88b3ff);
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(63, 111, 206, 0.4);
+}
+
+.baja-pm-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 13px 28px rgba(63, 111, 206, 0.45);
+}
+
+.baja-pm-button-disabled {
+  background: #d9e4fb;
+  color: #7b8eb0;
+  cursor: default;
+  box-shadow: none;
+}
+
+.baja-pm-footnote {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6b7b97;
+}
+
+/* BUSCADOR Y FILTROS (DERECHA) */
+
+.baja-pm-search-box {
+  margin-top: 4px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  background: #f6f9ff;
+  border-radius: 999px;
+  border: 1px solid #dde7fb;
+  padding: 4px 10px;
+}
+
+.baja-pm-search-icon {
+  font-size: 14px;
+  margin-right: 6px;
+}
+
+.baja-pm-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  flex: 1;
+  color: #142033;
+}
+
+.baja-pm-filters-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/* LISTA DE PMS */
+
+.baja-pm-list-header {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 100px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7a89a5;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.baja-pm-list-col-sel {
+  text-align: center;
+}
+
+.baja-pm-list-col-name {
+  text-align: left;
+}
+
+.baja-pm-list-col-origin {
+  text-align: right;
+}
+
+.baja-pm-list {
+  border-radius: 14px;
+  border: 1px solid #dde7fb;
+  background: #f6f9ff;
+  max-height: 420px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.baja-pm-list-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 100px;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #142033;
+  background: #ffffff;
+  border: 1px solid transparent;
+  margin-bottom: 4px;
+  transition: background 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease,
+    transform 0.05s ease;
+}
+
+.baja-pm-list-row:hover {
+  background: #eef5ff;
+}
+
+.baja-pm-list-row-active {
+  border-color: #5b8def;
+  box-shadow: 0 8px 18px rgba(63, 111, 206, 0.25);
+  transform: translateY(-1px);
+}
+
+.baja-pm-radio {
+  justify-self: center;
+}
+
+.baja-pm-list-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.baja-pm-list-name {
+  font-weight: 600;
+  color: #27446f;
+}
+
+.baja-pm-list-id {
+  font-size: 11px;
+  color: #7a89a5;
+}
+
+.baja-pm-list-origin {
+  font-size: 12px;
+  color: #6b7b97;
+  text-align: right;
+}
+
+/* RESPONSIVE: TABLET / CELULAR */
+
+@media (max-width: 960px) {
+  .baja-pm-page {
+    padding: 20px 10px;
+  }
+
+  .baja-pm-header {
+    flex-direction: column;
+  }
+
+  .baja-pm-header-badge {
+    width: 100%;
+  }
+
+  .baja-pm-grid {
+    grid-template-columns: minmax(0, 1fr); /* Primero equipo, luego lista de PMs */
+  }
+}
+
+@media (max-width: 640px) {
+  .baja-pm-header-main {
+    padding: 14px 14px;
+  }
+
+  .baja-pm-card {
+    padding: 14px 14px;
+  }
+
+  .baja-pm-title {
+    font-size: 19px;
+  }
+
+  .baja-pm-filters-row {
+    flex-direction: column;
+  }
+
+  .baja-pm-list-header {
+    display: none; /* en cel simplificamos el header */
+  }
+
+  .baja-pm-list-row {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+
+  .baja-pm-list-origin {
+    display: none;
+  }
+}

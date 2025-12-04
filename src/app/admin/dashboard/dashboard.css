@@ -1,0 +1,417 @@
+/* Fondo general tipo app iOS */
+.frida-dashboard {
+  min-height: 100vh;
+  padding: 24px 16px 40px;
+  background: linear-gradient(
+    180deg,
+    #fdf2ff 0%,
+    #ffffff 45%,
+    #f5f3ff 100%
+  );
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI", sans-serif;
+  color: #0f172a;
+}
+
+.frida-container {
+  margin: 0 auto;
+  max-width: 1080px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* HEADER */
+
+.frida-header-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 40px rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(216, 180, 254, 0.5);
+}
+
+@media (min-width: 768px) {
+  .frida-header-card {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.frida-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #7e22ce;
+  background: linear-gradient(90deg, #f5f3ff, #fee2ff);
+}
+
+.frida-title {
+  margin: 6px 0 0;
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.frida-title-highlight {
+  background: linear-gradient(90deg, #7c3aed, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text; /* fix del warning */
+  color: transparent;
+}
+
+.frida-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.frida-header-right {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+@media (min-width: 768px) {
+  .frida-header-right {
+    align-items: flex-end;
+  }
+}
+
+.frida-date-pill {
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(90deg, #7c3aed, #ec4899);
+  box-shadow: 0 10px 30px rgba(147, 51, 234, 0.4);
+}
+
+/* BLOQUE DE SUBIDA PARA FRIDA */
+
+.frida-upload {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.frida-upload-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4c1d95;
+  background: #f3e8ff;
+  border: 1px dashed #c4b5fd;
+  cursor: pointer;
+}
+
+.frida-upload-label input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.frida-upload-button {
+  margin-top: 2px;
+}
+
+.frida-upload-status {
+  font-size: 11px;
+  color: #4b5563;
+}
+
+.frida-upload-hint {
+  font-size: 10px;
+  color: #9ca3af;
+  max-width: 220px;
+}
+
+/* CARDS RESUMEN */
+
+.frida-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .frida-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.frida-card {
+  padding: 14px 16px;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 12px 25px rgba(148, 163, 184, 0.18);
+}
+
+.frida-card-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.frida-card-number {
+  margin-top: 4px;
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.frida-card-help {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.frida-card-purple .frida-card-number {
+  color: #7c3aed;
+}
+
+.frida-card-green .frida-card-number {
+  color: #10b981;
+}
+
+.frida-card-pink .frida-card-number {
+  color: #ec4899;
+}
+
+/* TABLA */
+
+.frida-table-card {
+  padding: 18px 18px 22px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  box-shadow: 0 20px 40px rgba(148, 163, 184, 0.3);
+}
+
+.frida-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.frida-table-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.frida-table-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.frida-table-message {
+  padding: 14px;
+  font-size: 13px;
+  text-align: center;
+  color: #4b5563;
+}
+
+.frida-alert {
+  padding: 10px 12px;
+  border-radius: 18px;
+  font-size: 13px;
+}
+
+.frida-alert-error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.frida-alert-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #facc15;
+}
+
+.frida-table-wrapper {
+  margin-top: 6px;
+  border-radius: 22px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+/* tabla en sí */
+
+.frida-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.frida-table thead {
+  position: sticky;
+  top: 0;
+  background: #f9fafb;
+  z-index: 1;
+}
+
+.frida-table th,
+.frida-table td {
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.frida-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.frida-table tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.frida-table tbody tr:nth-child(even) {
+  background: #fdf2ff;
+}
+
+.frida-table tbody tr:hover {
+  background: #f3e8ff;
+}
+
+/* celda archivo */
+
+.frida-file-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.frida-file-name {
+  font-weight: 600;
+  color: #0f172a;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frida-file-sub {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* estado */
+
+.frida-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.frida-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  margin-right: 6px;
+}
+
+.frida-status-open {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fed7aa;
+}
+
+.frida-status-open .frida-status-dot {
+  background: #f59e0b;
+}
+
+.frida-status-closed {
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+}
+
+.frida-status-closed .frida-status-dot {
+  background: #10b981;
+}
+
+/* acciones / botones */
+
+.frida-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.frida-btn {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.1s;
+}
+
+.frida-btn:active {
+  transform: translateY(1px);
+}
+
+.frida-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* negro */
+
+.frida-btn-dark {
+  background: #020617;
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.35);
+}
+
+/* gradiente */
+
+.frida-btn-gradient {
+  background: linear-gradient(90deg, #7c3aed, #ec4899);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(147, 51, 234, 0.45);
+}
+
+/* ghost rojo claro */
+
+.frida-btn-ghost {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
