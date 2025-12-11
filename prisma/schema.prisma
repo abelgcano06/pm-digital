@@ -1,0 +1,130 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ======================================================
+// Estados del PM (para Frida)
+// ======================================================
+enum PMStatus {
+  OPEN // PM generado sin ejecutar (lo ve el asociado)
+  COMPLETED // Asociado ya lo terminó y se generó EXEC
+  CLOSED // Frida ya lo revisó y lo cerró
+}
+
+// ======================================================
+// PDF que sube Frida
+// ======================================================
+model PMUploadedFile {
+  id         String   @id @default(cuid())
+  fileName   String
+  blobUrl    String
+  uploadedBy String?
+  uploadedAt DateTime @default(now())
+  active     Boolean  @default(true)
+
+  // GL responsable y tipo de PM
+  glOwner String? @default("")
+  pmType  String? @default("")
+
+  // Relación 1–1 con PMTemplate (opcional)
+  template PMTemplate?
+
+  // Estado lógico del PM (abierto/completado/cerrado)
+  pmStatus PMStatus @default(OPEN)
+
+  @@index([fileName])
+}
+
+// ======================================================
+// Plantilla del PM (resultado del parse del PDF)
+// ======================================================
+model PMTemplate {
+  id          String  @id @default(cuid())
+  pmNumber    String
+  name        String
+  assetCode   String?
+  location    String?
+  pdfFileName String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relación 1–1 con PMUploadedFile
+  uploadedFileId String?         @unique
+  uploadedFile   PMUploadedFile? @relation(fields: [uploadedFileId], references: [id])
+
+  tasks      PMTaskTemplate[]
+  executions PMExecution[]
+}
+
+// ======================================================
+// Tareas (líneas) de la plantilla
+// ======================================================
+model PMTaskTemplate {
+  id           String @id @default(cuid())
+  taskIdNumber Int
+  majorStep    String
+  keyPoints    String
+  reason       String
+  order        Int
+
+  // Indicador de que este punto hace referencia a una imagen
+  hasImage Boolean @default(false)
+
+  pmTemplateId String
+  pmTemplate   PMTemplate @relation(fields: [pmTemplateId], references: [id])
+
+  executions PMTaskExecution[]
+}
+
+// ======================================================
+// Ejecución de un PM (cada vez que un equipo lo corre)
+// ======================================================
+model PMExecution {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pmTemplateId String
+  pmTemplate   PMTemplate @relation(fields: [pmTemplateId], references: [id])
+
+  startedAt  DateTime
+  finishedAt DateTime
+  durationMs Int
+
+  groupLeader     String @default("")
+  associate1      String @default("")
+  associate2      String @default("")
+  executionPdfUrl String @default("")
+
+  taskExecutions PMTaskExecution[]
+}
+
+// ======================================================
+// Resultado por tarea (ejecución de cada punto del PM)
+// ======================================================
+model PMTaskExecution {
+  id String @id @default(cuid())
+
+  pmExecutionId String
+  pmExecution   PMExecution @relation(fields: [pmExecutionId], references: [id])
+
+  templateTaskId String
+  templateTask   PMTaskTemplate @relation(fields: [templateTaskId], references: [id])
+
+  status       String
+  comment      String
+  flagged      Boolean
+  measureValue String?
+   // 👇 URL de la foto de evidencia (en Vercel Blob)
+  photoUrl    String?   // null si no hay foto
+
+  createdAt DateTime @default(now())
+}
