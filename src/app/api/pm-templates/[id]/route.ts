@@ -20,9 +20,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
       );
     }
 
-    // 🔴 IMPORTANTE:
-    // Aquí buscamos por PMTemplate.id (NO por PMUploadedFile.id)
-    const template = await prisma.pMTemplate.findUnique({
+    let template = await prisma.pMTemplate.findUnique({
       where: { id },
       include: {
         tasks: true,
@@ -30,15 +28,44 @@ export async function GET(_req: Request, { params }: RouteParams) {
       },
     });
 
+    // 🟡 Si NO lo encontró por PMTemplate.id,
+    // intentamos interpretarlo como id de PMUploadedFile
     if (!template) {
-      // Solo este mensaje sencillo
+      // 1) Buscar template por uploadedFileId = id
+      const viaUploadedId = await prisma.pMTemplate.findFirst({
+        where: { uploadedFileId: id },
+        include: {
+          tasks: true,
+          uploadedFile: true,
+        },
+      });
+
+      if (viaUploadedId) {
+        template = viaUploadedId;
+      } else {
+        // 2) Buscar el PMUploadedFile y, si tiene template, usar ese
+        const uploaded = await prisma.pMUploadedFile.findUnique({
+          where: { id },
+          include: {
+            template: {
+              include: { tasks: true, uploadedFile: true },
+            },
+          },
+        });
+
+        if (uploaded?.template) {
+          template = uploaded.template as any;
+        }
+      }
+    }
+
+    if (!template) {
       return NextResponse.json(
         { error: "PMTemplate no encontrado" },
         { status: 404 }
       );
     }
 
-    // Armamos respuesta exactamente como la espera el front
     const responseBody = {
       id: template.id,
       pmNumber: template.pmNumber,
