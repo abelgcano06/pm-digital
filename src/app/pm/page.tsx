@@ -6,11 +6,23 @@ import { useRouter } from "next/navigation";
 import "./pm-selection.css";
 
 type PMFile = {
-  id: string; // ESTE ya es el PMTemplate.id
+  // 🔹 ESTE id ES SIEMPRE PMTemplate.id (viene de /api/pm-files)
+  id: string;
+
+  uploadedFileId: string;
   fileName: string;
   blobUrl: string;
+
+  pmNumber: string;
+  pmName: string;
+  assetCode?: string | null;
+  location?: string | null;
+
   glOwner?: string | null;
   pmType?: string | null;
+  pmStatus?: "OPEN" | "COMPLETED" | "CLOSED";
+
+  uploadedAt: string;
 };
 
 const GL_OPTIONS = [
@@ -69,6 +81,9 @@ export default function PMSelectionPage() {
           arr = json.items;
         }
 
+        // Pequeño log de depuración (lo puedes quitar si quieres)
+        console.log("PMs desde /api/pm-files:", arr);
+
         setPmFiles(arr as PMFile[]);
       } catch (err: any) {
         console.error("Error cargando /api/pm-files:", err);
@@ -100,7 +115,7 @@ export default function PMSelectionPage() {
       return t === pmTypeFilter.toLowerCase();
     });
 
-  // ---- Iniciar PM (sin llamar /api/pm-import) ----
+  // ---- Iniciar PM (YA SIN /api/pm-import) ----
   async function handleStartPM(e: React.FormEvent) {
     e.preventDefault();
     setStartError(null);
@@ -120,18 +135,23 @@ export default function PMSelectionPage() {
       return;
     }
 
-    // 🚀 Ya no llamamos /api/pm-import
-    // Usamos directamente el PMTemplate.id (que viene en pm.id)
+    // 🔴 YA NO LLAMAMOS /api/pm-import
+    // Directo abrimos el PMTemplate con ese id
     setIsStarting(true);
-
-    // Redirigir a la ejecución del PM
-    router.push(
-      `/pm/${selected.id}?op1=${encodeURIComponent(
-        operator1
-      )}&op2=${encodeURIComponent(
-        operator2
-      )}&gl=${encodeURIComponent(groupLeader)}`
-    );
+    try {
+      router.push(
+        `/pm/${selected.id}?op1=${encodeURIComponent(
+          operator1
+        )}&op2=${encodeURIComponent(
+          operator2
+        )}&gl=${encodeURIComponent(groupLeader)}`
+      );
+    } catch (err: any) {
+      console.error("Error al iniciar PM:", err);
+      setStartError(err?.message ?? "Error al iniciar PM, intenta de nuevo.");
+    } finally {
+      setIsStarting(false);
+    }
   }
 
   const nowLabel = new Intl.DateTimeFormat("es-MX", {
