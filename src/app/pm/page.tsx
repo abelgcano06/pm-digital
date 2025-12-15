@@ -6,15 +6,18 @@ import { useRouter } from "next/navigation";
 import "./pm-selection.css";
 
 type PMFile = {
-  // 🔹 ESTE id ES SIEMPRE PMTemplate.id (viene de /api/pm-files)
+  // ✅ Este id es el PMUploadedFile.id (NO el template)
   id: string;
 
   uploadedFileId: string;
   fileName: string;
   blobUrl: string;
 
-  pmNumber: string;
-  pmName: string;
+  // ✅ Si existe, este es el ID real del PMTemplate
+  pmTemplateId: string | null;
+
+  pmNumber: string | null;
+  pmName: string | null;
   assetCode?: string | null;
   location?: string | null;
 
@@ -67,24 +70,15 @@ export default function PMSelectionPage() {
         setLoadingError(null);
 
         const res = await fetch("/api/pm-files", { cache: "no-store" });
-
-        if (!res.ok) {
-          throw new Error("No se pudo cargar la lista de PMs");
-        }
+        if (!res.ok) throw new Error("No se pudo cargar la lista de PMs");
 
         const json = await res.json();
 
         let arr: any[] = [];
-        // Soportar tanto array directo como { items: [...] }
-        if (Array.isArray(json)) {
-          arr = json;
-        } else if (Array.isArray(json?.items)) {
-          arr = json.items;
-        }
+        if (Array.isArray(json)) arr = json;
+        else if (Array.isArray(json?.items)) arr = json.items;
 
-        // Pequeño log de depuración (lo puedes quitar si quieres)
         console.log("PMs desde /api/pm-files:", arr);
-
         setPmFiles(arr as PMFile[]);
       } catch (err: any) {
         console.error("Error cargando /api/pm-files:", err);
@@ -103,7 +97,7 @@ export default function PMSelectionPage() {
   // Lista filtrada por texto + GL + tipo de PM
   const filteredPmFiles = pmFiles
     .filter((pm) =>
-      pm.fileName.toLowerCase().includes(searchTerm.toLowerCase())
+      (pm.fileName || "").toLowerCase().includes(searchTerm.toLowerCase())
     )
     .filter((pm) => {
       if (glFilter === "all") return true;
@@ -116,7 +110,7 @@ export default function PMSelectionPage() {
       return t === pmTypeFilter.toLowerCase();
     });
 
-  // ---- Iniciar PM (YA SIN /api/pm-import) ----
+  // ---- Iniciar PM (AQUÍ se crea template si no existe) ----
   async function handleStartPM(e: React.FormEvent) {
     e.preventDefault();
     setStartError(null);
@@ -136,16 +130,46 @@ export default function PMSelectionPage() {
       return;
     }
 
-    // 🔴 YA NO LLAMAMOS /api/pm-import
-    // Directo abrimos el PMTemplate con ese id
     setIsStarting(true);
+
     try {
+      let templateId = selected.pmTemplateId;
+
+      // ✅ Si no hay template todavía, correr import/parsing (OpenAI + DB)
+      if (!templateId) {
+        const res = await fetch("/api/pm-import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: selected.fileName,
+            blobUrl: selected.blobUrl,
+          }),
+        });
+
+        if (!res.ok) {
+          let msg = "Error al importar el PM";
+          try {
+            const data = await res.json();
+            if (data?.error) msg = data.error;
+          } catch {}
+          throw new Error(msg);
+        }
+
+        const created = await res.json();
+        templateId = created?.id;
+
+        if (!templateId) {
+          throw new Error("El import no devolvió templateId");
+        }
+      }
+
+      // ✅ Ahora sí, navegar usando PMTemplate.id (no el uploadedFileId)
       router.push(
-        `/pm/${selected.id}?op1=${encodeURIComponent(
+        `/pm/${templateId}?op1=${encodeURIComponent(
           operator1
-        )}&op2=${encodeURIComponent(
-          operator2
-        )}&gl=${encodeURIComponent(groupLeader)}`
+        )}&op2=${encodeURIComponent(operator2)}&gl=${encodeURIComponent(
+          groupLeader
+        )}`
       );
     } catch (err: any) {
       console.error("Error al iniciar PM:", err);
@@ -201,8 +225,7 @@ export default function PMSelectionPage() {
               <div>
                 <h2 className="baja-pm-card-title">Equipo que ejecuta el PM</h2>
                 <p className="baja-pm-card-help">
-                  Para activar la lista de PMs, captura al menos Asociado 1 y
-                  GL.
+                  Para iniciar, captura al menos Asociado 1 y GL.
                 </p>
               </div>
             </div>
@@ -278,8 +301,7 @@ export default function PMSelectionPage() {
               <div>
                 <h2 className="baja-pm-card-title">PMs disponibles</h2>
                 <p className="baja-pm-card-help">
-                  Busca por nombre o selecciona de la lista. Solo se muestran
-                  los PMs que Frida subió este periodo.
+                  Busca por nombre o selecciona de la lista.
                 </p>
               </div>
               {loading && (
@@ -334,7 +356,6 @@ export default function PMSelectionPage() {
               </div>
             </div>
 
-            {/* Mensajes de error / vacío */}
             {loadingError && (
               <div className="baja-pm-alert baja-pm-alert-error">
                 {loadingError}
@@ -343,12 +364,10 @@ export default function PMSelectionPage() {
 
             {!loading && filteredPmFiles.length === 0 && !loadingError && (
               <div className="baja-pm-alert baja-pm-alert-warning">
-                No hay PMs que coincidan con la búsqueda o Frida aún no ha
-                cargado los PDFs de este periodo.
+                No hay PMs que coincidan con la búsqueda.
               </div>
             )}
 
-            {/* Lista de PMs */}
             {!loading && filteredPmFiles.length > 0 && (
               <div className="baja-pm-list-header">
                 <span className="baja-pm-list-col-sel">Sel.</span>
@@ -376,7 +395,16 @@ export default function PMSelectionPage() {
                     <div className="baja-pm-list-main">
                       <div className="baja-pm-list-name">{pm.fileName}</div>
                       <div className="baja-pm-list-id">
-                        ID: <span>{pm.id}</span>
+                        ID: <span>{pm.id}</span>{" "}
+                        {pm.pmTemplateId ? (
+                          <span style={{ marginLeft: 8, opacity: 0.8 }}>
+                            (template OK)
+                          </span>
+                        ) : (
+                          <span style={{ marginLeft: 8, opacity: 0.8 }}>
+                            (se generará al iniciar)
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="baja-pm-list-origin">Nube Frida</div>

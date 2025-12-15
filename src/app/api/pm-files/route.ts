@@ -3,72 +3,43 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "force-no-store";
 
-
-/**
- * Devuelve la lista de PMs disponibles para el asociado.
- *
- * - Se basa en PMUploadedFile + (opcional) PMTemplate
- * - Solo muestra PMs activos (active = true)
- * - Los PMs aparecen aunque todavía no tengan template generado
- */
 export async function GET() {
   try {
     const files = await prisma.pMUploadedFile.findMany({
-      where: {
-        active: true,
-        // si quieres que el asociado solo vea PMs abiertos, puedes agregar:
-        // pmStatus: "OPEN",
-      },
-      include: {
-        template: true, // puede venir null si aún no se ha importado
-      },
-      orderBy: {
-        uploadedAt: "desc",
-      },
+      where: { active: true },
+      include: { template: true },
+      orderBy: { uploadedAt: "desc" },
     });
 
-    const items = files.map((f) => {
-      const t = f.template;
+    const items = files.map((f) => ({
+      // ✅ el ID de selección SIEMPRE es el uploadedFileId
+      uploadedFileId: f.id,
 
-      return {
-        // ⚠️ IMPORTANTE:
-        // usamos el ID del archivo subido como identificador en la app del asociado
-        // (no dependemos de que ya exista template)
-        id: f.id,
+      fileName: f.fileName,
+      blobUrl: f.blobUrl,
 
-        // Info del archivo original
-        uploadedFileId: f.id,
-        fileName: f.fileName,
-        blobUrl: f.blobUrl,
+      glOwner: f.glOwner,
+      pmType: f.pmType,
+      pmStatus: f.pmStatus,
+      uploadedAt: f.uploadedAt,
 
-        // Info funcional del PM (si ya hay template)
-        pmTemplateId: t?.id ?? null,
-        pmNumber: t?.pmNumber ?? null,
-        pmName: t?.name ?? null,
-        assetCode: t?.assetCode ?? null,
-        location: t?.location ?? null,
+      // ✅ info opcional
+      hasTemplate: !!f.template,
+      templateId: f.template?.id ?? null,
 
-        // Datos que llenó Frida
-        glOwner: f.glOwner,
-        pmType: f.pmType,
-        pmStatus: f.pmStatus, // "OPEN" | "COMPLETED" | "CLOSED"
-
-        uploadedAt: f.uploadedAt,
-      };
-    });
+      // si existen en template:
+      pmNumber: f.template?.pmNumber ?? null,
+      pmName: f.template?.name ?? null,
+      assetCode: f.template?.assetCode ?? null,
+      location: f.template?.location ?? null,
+    }));
 
     return NextResponse.json({ items });
   } catch (err: any) {
     console.error("💥 Error en /api/pm-files:", err);
     return NextResponse.json(
-      {
-        error: "No se pudo obtener la lista de PMs",
-        details: err?.message || String(err),
-      },
+      { error: "No se pudo obtener la lista de PMs", details: err?.message || String(err) },
       { status: 500 }
     );
   }
