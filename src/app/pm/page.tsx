@@ -1,4 +1,3 @@
-// src/app/pm/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,26 +5,27 @@ import { useRouter } from "next/navigation";
 import "./pm-selection.css";
 
 type PMFile = {
-  // ✅ ID real del archivo subido (PMUploadedFile.id)
-  uploadedFileId: string;
+  // ID del archivo subido (PMUploadedFile.id) — siempre existe
+  id: string;
 
+  uploadedFileId: string;
   fileName: string;
   blobUrl: string;
 
-  glOwner?: string | null;
-  pmType?: string | null;
-  pmStatus?: "OPEN" | "COMPLETED" | "CLOSED";
-  uploadedAt?: string;
+  // Puede venir null si aún no se ha importado/parceado
+  pmTemplateId: string | null;
 
-  // ✅ viene de /api/pm-files
-  hasTemplate?: boolean;
-  templateId?: string | null;
-
-  // opcionales (si template existe)
-  pmNumber?: string | null;
-  pmName?: string | null;
+  pmNumber: string | null;
+  pmName: string | null;
   assetCode?: string | null;
   location?: string | null;
+
+  // ✅ estos dos los queremos mostrar en la lista
+  glOwner?: string | null;
+  pmType?: string | null;
+
+  pmStatus?: "OPEN" | "COMPLETED" | "CLOSED";
+  uploadedAt: string;
 };
 
 const GL_OPTIONS = [
@@ -41,6 +41,18 @@ const GL_OPTIONS = [
 
 const PM_TYPES = ["online", "offline", "pdm", "4s+s"];
 
+function prettyPMType(t?: string | null) {
+  const v = (t || "").trim();
+  if (!v) return "—";
+  return v.toUpperCase();
+}
+
+function prettyGLOwner(gl?: string | null) {
+  const v = (gl || "").trim();
+  if (!v) return "—";
+  return v;
+}
+
 export default function PMSelectionPage() {
   const router = useRouter();
 
@@ -48,8 +60,8 @@ export default function PMSelectionPage() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
-  // ✅ seleccionamos por uploadedFileId (PMUploadedFile.id)
-  const [selectedUploadedFileId, setSelectedUploadedFileId] = useState<string | null>(null);
+  // Este es PMUploadedFile.id
+  const [selectedPmId, setSelectedPmId] = useState<string | null>(null);
 
   const [operator1, setOperator1] = useState("");
   const [operator2, setOperator2] = useState("");
@@ -91,7 +103,9 @@ export default function PMSelectionPage() {
   }, []);
 
   const filteredPmFiles = pmFiles
-    .filter((pm) => (pm.fileName || "").toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter((pm) =>
+      (pm.fileName || "").toLowerCase().includes(searchTerm.toLowerCase())
+    )
     .filter((pm) => {
       if (glFilter === "all") return true;
       const gl = (pm.glOwner || "").toLowerCase();
@@ -107,7 +121,7 @@ export default function PMSelectionPage() {
     e.preventDefault();
     setStartError(null);
 
-    if (!selectedUploadedFileId) {
+    if (!selectedPmId) {
       setStartError("Selecciona un PM de la lista.");
       return;
     }
@@ -116,7 +130,7 @@ export default function PMSelectionPage() {
       return;
     }
 
-    const selected = pmFiles.find((pm) => pm.uploadedFileId === selectedUploadedFileId);
+    const selected = pmFiles.find((pm) => pm.id === selectedPmId);
     if (!selected) {
       setStartError("No se encontró la información del PM seleccionado.");
       return;
@@ -124,42 +138,47 @@ export default function PMSelectionPage() {
 
     setIsStarting(true);
     try {
-      // ✅ si ya existe template, usarlo
-      let templateId = selected.templateId ?? null;
+      // ✅ Si ya existe template, úsalo
+      let templateId = selected.pmTemplateId;
 
-      // ✅ si NO existe, generarlo aquí con /api/pm-import
+      // ✅ Si NO existe, lo generamos (IA + parsing) aquí
       if (!templateId) {
         const res = await fetch("/api/pm-import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            uploadedFileId: selected.uploadedFileId,
-            fileName: selected.fileName, // opcional para logs/fallback
-            blobUrl: selected.blobUrl,   // opcional fallback
+            uploadedFileId: selected.uploadedFileId || selected.id,
+            fileName: selected.fileName,
+            blobUrl: selected.blobUrl,
           }),
         });
 
         const data = await res.json().catch(() => ({} as any));
 
         if (!res.ok) {
-          const msg = data?.error || "Error al importar el PM.";
+          const msg =
+            data?.error ||
+            "Error al importar el PM (revisa logs del server / Vercel).";
           const details = data?.details ? `\n${data.details}` : "";
           throw new Error(msg + details);
         }
 
         templateId = data?.id;
-        if (!templateId) throw new Error("La importación no devolvió templateId.");
+        if (!templateId)
+          throw new Error("La importación no devolvió templateId.");
 
-        // reflejar en UI sin recargar
+        // opcional: reflejarlo en UI sin recargar
         setPmFiles((prev) =>
           prev.map((x) =>
-            x.uploadedFileId === selected.uploadedFileId ? { ...x, templateId } : x
+            x.id === selected.id ? { ...x, pmTemplateId: templateId } : x
           )
         );
       }
 
       router.push(
-        `/pm/${templateId}?op1=${encodeURIComponent(operator1)}&op2=${encodeURIComponent(
+        `/pm/${templateId}?op1=${encodeURIComponent(
+          operator1
+        )}&op2=${encodeURIComponent(
           operator2
         )}&gl=${encodeURIComponent(groupLeader)}`
       );
@@ -181,7 +200,7 @@ export default function PMSelectionPage() {
   }).format(new Date());
 
   const startDisabled =
-    isStarting || !selectedUploadedFileId || !operator1.trim() || !groupLeader.trim();
+    isStarting || !selectedPmId || !operator1.trim() || !groupLeader.trim();
 
   return (
     <div className="baja-pm-page">
@@ -201,7 +220,9 @@ export default function PMSelectionPage() {
 
           <div className="baja-pm-header-badge">
             <span className="baja-pm-badge-title">Turno actual</span>
-            <span className="baja-pm-badge-text">Completa nombres, elige PM y da iniciar.</span>
+            <span className="baja-pm-badge-text">
+              Completa nombres, elige PM y da iniciar.
+            </span>
           </div>
         </header>
 
@@ -211,7 +232,9 @@ export default function PMSelectionPage() {
               <div className="baja-pm-card-icon">👷‍♂️</div>
               <div>
                 <h2 className="baja-pm-card-title">Equipo que ejecuta el PM</h2>
-                <p className="baja-pm-card-help">Para iniciar, captura al menos Asociado 1 y GL.</p>
+                <p className="baja-pm-card-help">
+                  Para iniciar, captura al menos Asociado 1 y GL.
+                </p>
               </div>
             </div>
 
@@ -242,7 +265,8 @@ export default function PMSelectionPage() {
 
               <div className="baja-pm-input-group">
                 <label className="baja-pm-label">
-                  GL / Supervisor <span className="baja-pm-label-required">*</span>
+                  GL / Supervisor{" "}
+                  <span className="baja-pm-label-required">*</span>
                 </label>
                 <input
                   type="text"
@@ -253,7 +277,11 @@ export default function PMSelectionPage() {
                 />
               </div>
 
-              {startError && <div className="baja-pm-alert baja-pm-alert-error">{startError}</div>}
+              {startError && (
+                <div className="baja-pm-alert baja-pm-alert-error">
+                  {startError}
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -268,7 +296,8 @@ export default function PMSelectionPage() {
               </button>
 
               <p className="baja-pm-footnote">
-                Debes seleccionar un PM de la lista y tener Asociado 1 y GL para poder iniciar.
+                Debes seleccionar un PM de la lista y tener Asociado 1 y GL para
+                poder iniciar.
               </p>
             </form>
           </section>
@@ -278,9 +307,13 @@ export default function PMSelectionPage() {
               <div className="baja-pm-card-icon">📋</div>
               <div>
                 <h2 className="baja-pm-card-title">PMs disponibles</h2>
-                <p className="baja-pm-card-help">Busca por nombre o selecciona de la lista.</p>
+                <p className="baja-pm-card-help">
+                  Busca por nombre o selecciona de la lista.
+                </p>
               </div>
-              {loading && <span className="baja-pm-loading-tag">Cargando PMs...</span>}
+              {loading && (
+                <span className="baja-pm-loading-tag">Cargando PMs...</span>
+              )}
             </div>
 
             <div className="baja-pm-search-box">
@@ -328,7 +361,11 @@ export default function PMSelectionPage() {
               </div>
             </div>
 
-            {loadingError && <div className="baja-pm-alert baja-pm-alert-error">{loadingError}</div>}
+            {loadingError && (
+              <div className="baja-pm-alert baja-pm-alert-error">
+                {loadingError}
+              </div>
+            )}
 
             {!loading && filteredPmFiles.length === 0 && !loadingError && (
               <div className="baja-pm-alert baja-pm-alert-warning">
@@ -337,32 +374,65 @@ export default function PMSelectionPage() {
             )}
 
             {!loading && filteredPmFiles.length > 0 && (
+              <div className="baja-pm-list-header">
+                <span className="baja-pm-list-col-sel">Sel.</span>
+                <span className="baja-pm-list-col-name">PM</span>
+                <span className="baja-pm-list-col-origin">Asignación</span>
+              </div>
+            )}
+
+            {!loading && filteredPmFiles.length > 0 && (
               <div className="baja-pm-list">
                 {filteredPmFiles.map((pm) => (
                   <label
-                    key={pm.uploadedFileId}
+                    key={pm.id}
                     className={`baja-pm-list-row ${
-                      selectedUploadedFileId === pm.uploadedFileId ? "baja-pm-list-row-active" : ""
+                      selectedPmId === pm.id ? "baja-pm-list-row-active" : ""
                     }`}
                   >
                     <input
                       type="radio"
                       name="pmSelected"
                       className="baja-pm-radio"
-                      checked={selectedUploadedFileId === pm.uploadedFileId}
-                      onChange={() => setSelectedUploadedFileId(pm.uploadedFileId)}
+                      checked={selectedPmId === pm.id}
+                      onChange={() => setSelectedPmId(pm.id)}
                     />
 
                     <div className="baja-pm-list-main">
                       <div className="baja-pm-list-name">{pm.fileName}</div>
-                      <div className="baja-pm-list-id">
-                        ArchivoID: <span>{pm.uploadedFileId}</span>
-                        {pm.templateId ? (
+
+                      {/* ✅ GL y Tipo visibles */}
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          marginTop: 6,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span className="pm-badge pm-badge-chip">
+                          GL: {prettyGLOwner(pm.glOwner)}
+                        </span>
+                        <span className="pm-badge pm-badge-chip">
+                          Tipo: {prettyPMType(pm.pmType)}
+                        </span>
+                      </div>
+
+                      <div className="baja-pm-list-id" style={{ marginTop: 6 }}>
+                        ArchivoID: <span>{pm.id}</span>
+                        {pm.pmTemplateId ? (
                           <>
-                            {" "}• TemplateID: <span>{pm.templateId}</span>
+                            {" "}
+                            • TemplateID: <span>{pm.pmTemplateId}</span>
                           </>
                         ) : (
-                          <> • <span style={{ opacity: 0.8 }}>Sin template (se genera al iniciar)</span></>
+                          <>
+                            {" "}
+                            •{" "}
+                            <span style={{ opacity: 0.8 }}>
+                              Sin template (se genera al iniciar)
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
