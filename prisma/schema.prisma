@@ -123,8 +123,10 @@ model PMTaskExecution {
   comment      String
   flagged      Boolean
   measureValue String?
-   // 👇 URL de la foto de evidencia (en Vercel Blob)
-  photoUrl    String?   // null si no hay foto
+
+  // ✅ NUEVO: múltiples fotos
+  photoUrls String[] @default([])
 
   createdAt DateTime @default(now())
 }
+

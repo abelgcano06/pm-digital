@@ -1,7 +1,7 @@
 // src/app/pm/[id]/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import "./pm-execution.css";
 
@@ -34,13 +34,11 @@ type TaskExecution = {
   comment: string;
   flagged: boolean;
   measureValue?: string;
+  // ✅ NUEVO: fotos por tarea (URLs públicas en Vercel Blob)
+  photoUrls: string[];
 };
 
-export default function PMExecutionPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function PMExecutionPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
 
   const asociado1 = searchParams.get("op1") || searchParams.get("a1") || "";
@@ -57,6 +55,11 @@ export default function PMExecutionPage({
   const [finishedAt, setFinishedAt] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
 
+  // Fotos
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   useEffect(() => {
     const loadTemplate = async () => {
       try {
@@ -67,7 +70,6 @@ export default function PMExecutionPage({
         if (!res.ok) throw new Error("Error al cargar el PM");
 
         const data: PMTemplate = await res.json();
-
         const tasks = data.tasks ?? [];
         setPmTemplate({ ...data, tasks });
 
@@ -77,8 +79,10 @@ export default function PMExecutionPage({
             status: "pending",
             comment: "",
             flagged: false,
+            photoUrls: [], // ✅
           }))
         );
+
         setStartedAt(new Date().toISOString());
       } catch (e) {
         console.error(e);
@@ -113,11 +117,6 @@ export default function PMExecutionPage({
     }
     return c;
   }, [tasksExec]);
-
-  const progressPercent =
-    totalTasks > 0
-      ? Math.round(((totalTasks - counts.pending) / totalTasks) * 100)
-      : 0;
 
   const isMeasurementTask = (task: PMTaskTemplate | null): boolean => {
     if (!task) return false;
@@ -159,9 +158,7 @@ export default function PMExecutionPage({
     );
   };
 
-  const handleSetStatus = (status: TaskStatus) => {
-    updateCurrentExec({ status });
-  };
+  const handleSetStatus = (status: TaskStatus) => updateCurrentExec({ status });
 
   const toggleFlag = () => {
     if (!currentTaskExec) return;
@@ -173,14 +170,10 @@ export default function PMExecutionPage({
     if (currentTaskExec.status === "pending") return false;
 
     if (currentTaskExec.flagged && !currentTaskExec.comment.trim()) return false;
-    if (currentTaskExec.status === "nok" && !currentTaskExec.comment.trim())
-      return false;
+    if (currentTaskExec.status === "nok" && !currentTaskExec.comment.trim()) return false;
 
     if (requiresMeasure) {
-      if (
-        !currentTaskExec.measureValue ||
-        !currentTaskExec.measureValue.trim()
-      ) {
+      if (!currentTaskExec.measureValue || !currentTaskExec.measureValue.trim()) {
         return false;
       }
     }
@@ -191,40 +184,75 @@ export default function PMExecutionPage({
   const handleNext = () => {
     if (!canGoNext()) return;
     if (!pmTemplate) return;
-    if (currentIndex < tasksArray.length - 1) {
-      setCurrentIndex((i) => i + 1);
-    }
+    if (currentIndex < tasksArray.length - 1) setCurrentIndex((i) => i + 1);
   };
 
   const handlePrev = () => {
     if (!pmTemplate) return;
-    if (currentIndex > 0) {
-      setCurrentIndex((i) => i - 1);
-    }
+    if (currentIndex > 0) setCurrentIndex((i) => i - 1);
   };
+
+  // ✅ SUBIR FOTO(S) PARA LA TAREA ACTUAL
+  async function uploadPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    if (!currentTaskTemplate || !currentTaskExec) return;
+
+    setPhotoError(null);
+    setUploadingPhoto(true);
+
+    try {
+      for (const file of Array.from(files)) {
+        const fd = new FormData();
+        fd.append("file", file);
+
+        const res = await fetch("/api/pm-photo", {
+          method: "POST",
+          body: fd,
+        });
+
+        const data = await res.json().catch(() => ({} as any));
+
+        if (!res.ok || !data?.ok || !data?.url) {
+          const msg = data?.error || "No se pudo subir la foto";
+          throw new Error(msg);
+        }
+
+        updateCurrentExec({
+          photoUrls: [...(currentTaskExec.photoUrls || []), data.url],
+        });
+      }
+    } catch (e: any) {
+      console.error(e);
+      setPhotoError(e?.message || "Error subiendo foto");
+    } finally {
+      setUploadingPhoto(false);
+      // Reset input para permitir subir la misma foto dos veces si quieren
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removePhoto(url: string) {
+    if (!currentTaskExec) return;
+    updateCurrentExec({
+      photoUrls: (currentTaskExec.photoUrls || []).filter((u) => u !== url),
+    });
+  }
 
   const canFinish = useMemo(() => {
     if (!pmTemplate || tasksExec.length === 0) return false;
     if (counts.pending > 0) return false;
 
-    // NO OK => comentario obligatorio
     for (const t of tasksExec) {
       if (t.status === "nok" && !t.comment.trim()) return false;
     }
 
-    // Puntos que requieren medición
     for (const t of tasksExec) {
-      const templateTask = (pmTemplate.tasks ?? []).find(
-        (x) => x.id === t.taskId
-      );
+      const templateTask = (pmTemplate.tasks ?? []).find((x) => x.id === t.taskId);
       if (!templateTask) continue;
       const needsMeasure = isMeasurementTask(templateTask);
-      if (needsMeasure && (!t.measureValue || !t.measureValue.trim())) {
-        return false;
-      }
+      if (needsMeasure && (!t.measureValue || !t.measureValue.trim())) return false;
     }
 
-    // FLAG => comentario obligatorio
     for (const t of tasksExec) {
       if (t.flagged && !t.comment.trim()) return false;
     }
@@ -239,6 +267,7 @@ export default function PMExecutionPage({
     try {
       setFinishing(true);
       setError(null);
+
       const now = new Date().toISOString();
       setFinishedAt(now);
 
@@ -251,7 +280,7 @@ export default function PMExecutionPage({
         glNombre: glNombre || "SIN GL",
         startedAt: startedAt || now,
         finishedAt: now,
-        tasks: tasksExec,
+        tasks: tasksExec, // ✅ ahora ya incluye photoUrls
       };
 
       const res = await fetch("/api/pm-finish", {
@@ -289,7 +318,6 @@ export default function PMExecutionPage({
 
   return (
     <div className="pm-page">
-      {/* HEADER CON DETALLE DEL PM */}
       <header className="pm-header">
         <div className="pm-header-inner">
           <div className="pm-header-left">
@@ -327,23 +355,17 @@ export default function PMExecutionPage({
 
       <main className="pm-main">
         <div className="pm-main-inner">
-          {/* COLUMNA PRINCIPAL: TAREA ACTUAL */}
           <section className="pm-card pm-card-main">
             {error && <div className="pm-error-banner">{error}</div>}
 
             {currentTaskTemplate && currentTaskExec && (
               <div className="pm-task-panel">
-                {/* Encabezado del punto */}
                 <div className="pm-task-header">
                   <div className="pm-task-title-block">
                     <span className="pm-task-index">{currentIndex + 1}</span>
                     <div>
-                      <p className="pm-task-id">
-                        Task ID {currentTaskTemplate.taskIdNumber}
-                      </p>
-                      <h2 className="pm-task-title">
-                        {currentTaskTemplate.majorStep}
-                      </h2>
+                      <p className="pm-task-id">Task ID {currentTaskTemplate.taskIdNumber}</p>
+                      <h2 className="pm-task-title">{currentTaskTemplate.majorStep}</h2>
                     </div>
                   </div>
                   <div className="pm-task-status-block">
@@ -356,33 +378,25 @@ export default function PMExecutionPage({
                         ? "NO OK"
                         : "Pendiente"}
                     </span>
-                    {currentTaskExec.flagged && (
-                      <span className="pm-task-flag">FLAG</span>
-                    )}
+                    {currentTaskExec.flagged && <span className="pm-task-flag">FLAG</span>}
                   </div>
                 </div>
 
-                {/* Key points / Razón / PDF */}
                 <div className="pm-info-box">
                   <div className="pm-info-section">
                     <p className="pm-info-label">Key points</p>
-                    <p className="pm-info-text">
-                      {currentTaskTemplate.keyPoints || "-"}
-                    </p>
+                    <p className="pm-info-text">{currentTaskTemplate.keyPoints || "-"}</p>
                   </div>
 
                   <div className="pm-info-section pm-info-section--spaced">
                     <p className="pm-info-label">Razón</p>
-                    <p className="pm-info-text">
-                      {currentTaskTemplate.reason || "-"}
-                    </p>
+                    <p className="pm-info-text">{currentTaskTemplate.reason || "-"}</p>
                   </div>
 
                   {pdfUrl && (
                     <div className="pm-info-section pm-info-section--pdf">
                       <p className="pm-info-text">
-                        Si necesitas ver la imagen o esquema original, abre el
-                        PDF del PM.
+                        Si necesitas ver la imagen o esquema original, abre el PDF del PM.
                       </p>
                       <button
                         type="button"
@@ -395,7 +409,6 @@ export default function PMExecutionPage({
                   )}
                 </div>
 
-                {/* Resultado del punto */}
                 <div className="pm-controls-box">
                   <div className="pm-control-row">
                     <p className="pm-control-label">Resultado de este punto</p>
@@ -403,9 +416,7 @@ export default function PMExecutionPage({
                       <button
                         type="button"
                         className={`pm-btn ${
-                          currentTaskExec.status === "ok"
-                            ? "pm-btn--primary"
-                            : "pm-btn--ghost"
+                          currentTaskExec.status === "ok" ? "pm-btn--primary" : "pm-btn--ghost"
                         }`}
                         onClick={() => handleSetStatus("ok")}
                       >
@@ -414,9 +425,7 @@ export default function PMExecutionPage({
                       <button
                         type="button"
                         className={`pm-btn ${
-                          currentTaskExec.status === "nok"
-                            ? "pm-btn--danger"
-                            : "pm-btn--ghost"
+                          currentTaskExec.status === "nok" ? "pm-btn--danger" : "pm-btn--ghost"
                         }`}
                         onClick={() => handleSetStatus("nok")}
                       >
@@ -425,9 +434,7 @@ export default function PMExecutionPage({
                       <button
                         type="button"
                         className={`pm-btn ${
-                          currentTaskExec.flagged
-                            ? "pm-btn--flag-active"
-                            : "pm-btn--ghost"
+                          currentTaskExec.flagged ? "pm-btn--flag-active" : "pm-btn--ghost"
                         }`}
                         onClick={toggleFlag}
                       >
@@ -438,21 +445,79 @@ export default function PMExecutionPage({
 
                   {requiresMeasure && (
                     <div className="pm-measure-block">
-                      <span className="pm-measure-label">
-                        Medición / Valor registrado
-                      </span>
+                      <span className="pm-measure-label">Medición / Valor registrado</span>
                       <input
                         type="text"
                         className="pm-input pm-input--measure"
                         placeholder="Ej: 4.8 mm, 3.2%, 85 °C..."
                         value={currentTaskExec.measureValue || ""}
-                        onChange={(e) =>
-                          updateCurrentExec({ measureValue: e.target.value })
-                        }
+                        onChange={(e) => updateCurrentExec({ measureValue: e.target.value })}
                       />
                     </div>
                   )}
 
+                  {/* ✅ BLOQUE FOTOS */}
+                  <div className="pm-comments-block">
+                    <span className="pm-comments-label">Evidencia (fotos)</span>
+
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        multiple
+                        onChange={(e) => uploadPhotos(e.target.files)}
+                        disabled={uploadingPhoto}
+                      />
+
+                      <button
+                        type="button"
+                        className={`pm-btn ${uploadingPhoto ? "pm-btn--disabled" : "pm-btn--secondary"}`}
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingPhoto}
+                      >
+                        {uploadingPhoto ? "Subiendo..." : "Tomar / Subir foto"}
+                      </button>
+                    </div>
+
+                    {photoError && (
+                      <div className="pm-error-banner" style={{ marginTop: 8 }}>
+                        {photoError}
+                      </div>
+                    )}
+
+                    {(currentTaskExec.photoUrls || []).length > 0 && (
+                      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {currentTaskExec.photoUrls.map((url) => (
+                          <div key={url} style={{ width: 120 }}>
+                            <a href={url} target="_blank" rel="noreferrer">
+                              <img
+                                src={url}
+                                alt="Evidencia"
+                                style={{
+                                  width: "120px",
+                                  height: "90px",
+                                  objectFit: "cover",
+                                  borderRadius: 10,
+                                }}
+                              />
+                            </a>
+                            <button
+                              type="button"
+                              className="pm-btn pm-btn--ghost"
+                              style={{ width: "100%", marginTop: 6 }}
+                              onClick={() => removePhoto(url)}
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Comentarios */}
                   <div className="pm-comments-block">
                     <span className="pm-comments-label">
                       {currentTaskExec.flagged
@@ -471,23 +536,17 @@ export default function PMExecutionPage({
                           : "Opcional. Usa este espacio para detalles, mediciones extra, etc."
                       }
                       value={currentTaskExec.comment}
-                      onChange={(e) =>
-                        updateCurrentExec({ comment: e.target.value })
-                      }
+                      onChange={(e) => updateCurrentExec({ comment: e.target.value })}
                     />
-                    {(currentTaskExec.flagged ||
-                      currentTaskExec.status === "nok" ||
-                      requiresMeasure) && (
+                    {(currentTaskExec.flagged || currentTaskExec.status === "nok" || requiresMeasure) && (
                       <p className="pm-help-error">
-                        * Si el punto es NO OK, tiene FLAG o requiere medición,
-                        el comentario y/o la medición son obligatorios para
-                        continuar.
+                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la
+                        medición son obligatorios para continuar.
                       </p>
                     )}
                   </div>
                 </div>
 
-                {/* Navegación entre puntos */}
                 <footer className="pm-footer-nav">
                   <div className="pm-footer-left">
                     <button
@@ -502,9 +561,7 @@ export default function PMExecutionPage({
                   <div className="pm-footer-right-nav">
                     <button
                       type="button"
-                      className={`pm-btn ${
-                        canGoNext() ? "pm-btn--primary" : "pm-btn--disabled"
-                      }`}
+                      className={`pm-btn ${canGoNext() ? "pm-btn--primary" : "pm-btn--disabled"}`}
                       onClick={handleNext}
                       disabled={!canGoNext()}
                     >
@@ -513,26 +570,19 @@ export default function PMExecutionPage({
                   </div>
                 </footer>
 
-                {/* Progreso y flags */}
                 <div className="pm-progress-block">
                   <div className="pm-progress-row">
                     <span className="pm-progress-label">PROGRESO</span>
                     <span className="pm-progress-value">
-                      {counts.total > 0
-                        ? `${counts.ok + counts.nok}/${counts.total}`
-                        : "0/0"}{" "}
-                      puntos
+                      {counts.total > 0 ? `${counts.ok + counts.nok}/${counts.total}` : "0/0"} puntos
                     </span>
                   </div>
                   <div className="pm-progress-row">
                     <span className="pm-progress-label">FLAGS</span>
-                    <span className="pm-progress-value">
-                      {counts.flagged}
-                    </span>
+                    <span className="pm-progress-value">{counts.flagged}</span>
                   </div>
                 </div>
 
-                {/* Botón FINALIZAR */}
                 <div className="pm-finish-block">
                   <div className="pm-legend">
                     <span>OK: punto correcto</span>
@@ -547,49 +597,36 @@ export default function PMExecutionPage({
                     onClick={handleFinish}
                     disabled={!canFinish || finishing}
                   >
-                    {finishing
-                      ? "Generando PDF..."
-                      : "Finalizar y generar PDF"}
+                    {finishing ? "Generando PDF..." : "Finalizar y generar PDF"}
                   </button>
                 </div>
               </div>
             )}
           </section>
 
-          {/* COLUMNA DERECHA: RESUMEN / NAVEGACIÓN RÁPIDA */}
           <aside className="pm-card pm-card-side">
             <div className="pm-side-section">
               <h3 className="pm-side-title">Resumen del PM</h3>
               <div className="pm-side-stats">
                 <div className="pm-side-stat">
                   <span className="pm-side-stat-label">Total puntos</span>
-                  <span className="pm-side-stat-value">
-                    {counts.total}
-                  </span>
+                  <span className="pm-side-stat-value">{counts.total}</span>
                 </div>
                 <div className="pm-side-stat">
                   <span className="pm-side-stat-label">OK</span>
-                  <span className="pm-side-stat-value pm-side-stat-ok">
-                    {counts.ok}
-                  </span>
+                  <span className="pm-side-stat-value pm-side-stat-ok">{counts.ok}</span>
                 </div>
                 <div className="pm-side-stat">
                   <span className="pm-side-stat-label">NO OK</span>
-                  <span className="pm-side-stat-value pm-side-stat-nok">
-                    {counts.nok}
-                  </span>
+                  <span className="pm-side-stat-value pm-side-stat-nok">{counts.nok}</span>
                 </div>
                 <div className="pm-side-stat">
                   <span className="pm-side-stat-label">Pendientes</span>
-                  <span className="pm-side-stat-value pm-side-stat-pending">
-                    {counts.pending}
-                  </span>
+                  <span className="pm-side-stat-value pm-side-stat-pending">{counts.pending}</span>
                 </div>
                 <div className="pm-side-stat">
                   <span className="pm-side-stat-label">FLAGS</span>
-                  <span className="pm-side-stat-value pm-side-stat-flag">
-                    {counts.flagged}
-                  </span>
+                  <span className="pm-side-stat-value pm-side-stat-flag">{counts.flagged}</span>
                 </div>
               </div>
             </div>
@@ -610,15 +647,11 @@ export default function PMExecutionPage({
                     <button
                       key={task.id}
                       type="button"
-                      className={`pm-step ${statusClass} ${
-                        isCurrent ? "pm-step--current" : ""
-                      }`}
+                      className={`pm-step ${statusClass} ${isCurrent ? "pm-step--current" : ""}`}
                       onClick={() => setCurrentIndex(idx)}
                     >
                       <span className="pm-step-index">{idx + 1}</span>
-                      <span className="pm-step-id">
-                        {task.taskIdNumber}
-                      </span>
+                      <span className="pm-step-id">{task.taskIdNumber}</span>
                     </button>
                   );
                 })}
@@ -628,21 +661,18 @@ export default function PMExecutionPage({
             <div className="pm-side-section">
               <p className="pm-side-section-title">Notas</p>
               <p className="pm-side-text">
-                - Marca los puntos con <strong>FLAG</strong> cuando requieran
-                revisión del GL o de Mantenimiento.
+                - Marca los puntos con <strong>FLAG</strong> cuando requieran revisión del GL o de
+                Mantenimiento.
                 <br />
-                - Los puntos con <strong>NO OK</strong> deben tener comentario
-                obligatorio.
-                <br />
-                - Si el sistema detecta que el punto requiere{" "}
-                <strong>medición</strong>, deberás capturar el valor.
+                - Los puntos con <strong>NO OK</strong> deben tener comentario obligatorio.
+                <br />- Si el sistema detecta que el punto requiere <strong>medición</strong>,
+                deberás capturar el valor.
               </p>
             </div>
 
             <div className="pm-side-footnote">
-              Cuando termines todos los puntos y no haya pendientes, el botón
-              de <strong>“Finalizar y generar PDF”</strong> se habilitará
-              automáticamente.
+              Cuando termines todos los puntos y no haya pendientes, el botón de{" "}
+              <strong>“Finalizar y generar PDF”</strong> se habilitará automáticamente.
             </div>
           </aside>
         </div>

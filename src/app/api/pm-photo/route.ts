@@ -4,12 +4,14 @@ import { put } from "@vercel/blob";
 import { Buffer } from "buffer";
 
 export const runtime = "nodejs";
+// (Opcional) evita cache raro en routes
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
 
-    // El front debe mandar el archivo de la cámara como "file"
+    // El front debe mandar el archivo como "file"
     const file = formData.get("file") as File | null;
 
     if (!file) {
@@ -19,12 +21,19 @@ export async function POST(req: Request) {
       );
     }
 
-    // Convertimos el File a Buffer para subirlo al blob
+    // Validación básica
+    if (!file.type?.startsWith("image/")) {
+      return NextResponse.json(
+        { ok: false, error: "El archivo debe ser una imagen" },
+        { status: 400 }
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     const timestamp = Date.now();
-    const safeName = file.name.replace(/[^\w.-]+/g, "_") || "foto_pm.jpg";
+    const safeName = (file.name || "foto_pm.jpg").replace(/[^\w.-]+/g, "_");
 
     const blobName = `pm-photos/${timestamp}-${safeName}`;
 
@@ -33,7 +42,6 @@ export async function POST(req: Request) {
       contentType: file.type || "image/jpeg",
     });
 
-    // Por ahora solo devolvemos la URL. Más adelante podemos guardar en Prisma.
     return NextResponse.json({
       ok: true,
       url: blob.url,
