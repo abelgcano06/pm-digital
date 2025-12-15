@@ -103,6 +103,16 @@ export async function POST(req: Request) {
       finishedAt,
       tasks,
     } = body;
+console.log("🧾 pm-finish payload:", {
+  pmTemplateId,
+  tasksCount: Array.isArray(tasks) ? tasks.length : null,
+  sampleTask: Array.isArray(tasks) && tasks.length > 0 ? {
+    taskId: tasks[0]?.taskId,
+    status: tasks[0]?.status,
+    hasPhotoUrls: Array.isArray((tasks[0] as any)?.photoUrls),
+    photoUrlsCount: Array.isArray((tasks[0] as any)?.photoUrls) ? (tasks[0] as any).photoUrls.length : 0,
+  } : null,
+});
 
     // ==========================
     // Validaciones básicas

@@ -328,10 +328,22 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        console.error("Error finish:", text);
-        throw new Error("Error al generar el PDF.");
-      }
+  // Intentar leer JSON primero (tu API normalmente regresa JSON)
+  let payload: any = null;
+  try {
+    payload = await res.json();
+  } catch {
+    // si no fue JSON, caer a texto
+    const txt = await res.text();
+    throw new Error(txt || "Error al generar el PDF (respuesta no-JSON).");
+  }
+
+  const msg = payload?.error || "Error al generar el PDF.";
+  const details = payload?.details ? `\n${payload.details}` : "";
+  const extra = payload?.receivedType ? `\nreceivedType: ${payload.receivedType}` : "";
+  throw new Error(msg + details + extra);
+}
+
 
       const data = await res.json();
       if (!data?.url) throw new Error("La respuesta no incluye la URL del PDF.");
