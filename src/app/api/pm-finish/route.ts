@@ -589,9 +589,11 @@ console.log("🧾 pm-finish payload:", {
     let url: string;
     try {
       const { url: blobUrl } = await put(blobName, pdfBuffer, {
-        access: "public",
-        contentType: "application/pdf",
-      });
+  access: "public",
+  contentType: "application/pdf",
+  addRandomSuffix: true, // 🔥 FIX CLAVE
+});
+
       url = blobUrl;
     } catch (blobErr: any) {
       console.error("Error subiendo PDF a Blob:", blobErr);
