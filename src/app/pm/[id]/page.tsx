@@ -1,8 +1,8 @@
-// src/app/pm/[id]/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import heic2any from "heic2any";
 import "./pm-execution.css";
 
 type PMTaskTemplate = {
@@ -34,9 +34,40 @@ type TaskExecution = {
   comment: string;
   flagged: boolean;
   measureValue?: string;
-  // ✅ NUEVO: fotos por tarea (URLs públicas en Vercel Blob)
+
+  // ✅ fotos por tarea (URLs públicas en Vercel Blob)
   photoUrls: string[];
 };
+
+// ✅ Convierte HEIC/HEIF → JPG en el cliente
+async function normalizeImage(file: File): Promise<File> {
+  const t = (file.type || "").toLowerCase();
+
+  if (t === "image/heic" || t === "image/heif") {
+    const blob = (await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.9,
+    })) as Blob;
+
+    const newName = (file.name || "foto.heic").replace(/\.(heic|heif)$/i, ".jpg");
+    return new File([blob], newName, { type: "image/jpeg" });
+  }
+
+  // A veces iOS manda type vacío pero el nombre termina en .heic
+  if ((file.name || "").toLowerCase().endsWith(".heic") || (file.name || "").toLowerCase().endsWith(".heif")) {
+    const blob = (await heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.9,
+    })) as Blob;
+
+    const newName = (file.name || "foto.heic").replace(/\.(heic|heif)$/i, ".jpg");
+    return new File([blob], newName, { type: "image/jpeg" });
+  }
+
+  return file;
+}
 
 export default function PMExecutionPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
@@ -79,7 +110,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
             status: "pending",
             comment: "",
             flagged: false,
-            photoUrls: [], // ✅
+            photoUrls: [],
           }))
         );
 
@@ -192,7 +223,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     if (currentIndex > 0) setCurrentIndex((i) => i - 1);
   };
 
-  // ✅ SUBIR FOTO(S) PARA LA TAREA ACTUAL
+  // ✅ SUBIR FOTO(S) PARA LA TAREA ACTUAL (con conversión HEIC→JPG)
   async function uploadPhotos(files: FileList | null) {
     if (!files || files.length === 0) return;
     if (!currentTaskTemplate || !currentTaskExec) return;
@@ -201,9 +232,15 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     setUploadingPhoto(true);
 
     try {
+      // ⚠️ importante: no uses currentTaskExec directamente dentro del loop para el append
+      // porque el state puede quedar "stale". Mejor ir acumulando aquí:
+      let newUrls: string[] = [...(currentTaskExec.photoUrls || [])];
+
       for (const file of Array.from(files)) {
+        const normalized = await normalizeImage(file);
+
         const fd = new FormData();
-        fd.append("file", file);
+        fd.append("file", normalized);
 
         const res = await fetch("/api/pm-photo", {
           method: "POST",
@@ -214,19 +251,20 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
 
         if (!res.ok || !data?.ok || !data?.url) {
           const msg = data?.error || "No se pudo subir la foto";
-          throw new Error(msg);
+          const details = data?.details ? `\n${data.details}` : "";
+          throw new Error(msg + details);
         }
 
-        updateCurrentExec({
-          photoUrls: [...(currentTaskExec.photoUrls || []), data.url],
-        });
+        newUrls.push(data.url);
       }
+
+      // ✅ actualizar una sola vez al final
+      updateCurrentExec({ photoUrls: newUrls });
     } catch (e: any) {
       console.error(e);
       setPhotoError(e?.message || "Error subiendo foto");
     } finally {
       setUploadingPhoto(false);
-      // Reset input para permitir subir la misma foto dos veces si quieren
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -280,7 +318,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         glNombre: glNombre || "SIN GL",
         startedAt: startedAt || now,
         finishedAt: now,
-        tasks: tasksExec, // ✅ ahora ya incluye photoUrls
+        tasks: tasksExec, // ✅ incluye photoUrls por tarea
       };
 
       const res = await fetch("/api/pm-finish", {
@@ -340,13 +378,9 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   Asociado 1: {asociado1 || "SIN NOMBRE"}
                 </span>
                 {asociado2 && (
-                  <span className="pm-badge pm-badge-chip">
-                    Asociado 2: {asociado2}
-                  </span>
+                  <span className="pm-badge pm-badge-chip">Asociado 2: {asociado2}</span>
                 )}
-                <span className="pm-badge pm-badge-chip">
-                  GL: {glNombre || "SIN GL"}
-                </span>
+                <span className="pm-badge pm-badge-chip">GL: {glNombre || "SIN GL"}</span>
               </div>
             </div>
           </div>
@@ -369,9 +403,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     </div>
                   </div>
                   <div className="pm-task-status-block">
-                    <span
-                      className={`pm-task-status-badge pm-task-status-badge--${currentTaskExec.status}`}
-                    >
+                    <span className={`pm-task-status-badge pm-task-status-badge--${currentTaskExec.status}`}>
                       {currentTaskExec.status === "ok"
                         ? "OK"
                         : currentTaskExec.status === "nok"
@@ -415,27 +447,21 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     <div className="pm-control-buttons">
                       <button
                         type="button"
-                        className={`pm-btn ${
-                          currentTaskExec.status === "ok" ? "pm-btn--primary" : "pm-btn--ghost"
-                        }`}
+                        className={`pm-btn ${currentTaskExec.status === "ok" ? "pm-btn--primary" : "pm-btn--ghost"}`}
                         onClick={() => handleSetStatus("ok")}
                       >
                         OK
                       </button>
                       <button
                         type="button"
-                        className={`pm-btn ${
-                          currentTaskExec.status === "nok" ? "pm-btn--danger" : "pm-btn--ghost"
-                        }`}
+                        className={`pm-btn ${currentTaskExec.status === "nok" ? "pm-btn--danger" : "pm-btn--ghost"}`}
                         onClick={() => handleSetStatus("nok")}
                       >
                         NO OK
                       </button>
                       <button
                         type="button"
-                        className={`pm-btn ${
-                          currentTaskExec.flagged ? "pm-btn--flag-active" : "pm-btn--ghost"
-                        }`}
+                        className={`pm-btn ${currentTaskExec.flagged ? "pm-btn--flag-active" : "pm-btn--ghost"}`}
                         onClick={toggleFlag}
                       >
                         FLAG
@@ -461,6 +487,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     <span className="pm-comments-label">Evidencia (fotos)</span>
 
                     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      {/* input ocultable (pero lo dejamos visible por si quieres) */}
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -540,8 +567,8 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     />
                     {(currentTaskExec.flagged || currentTaskExec.status === "nok" || requiresMeasure) && (
                       <p className="pm-help-error">
-                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la
-                        medición son obligatorios para continuar.
+                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la medición son
+                        obligatorios para continuar.
                       </p>
                     )}
                   </div>
@@ -591,9 +618,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   </div>
                   <button
                     type="button"
-                    className={`pm-btn pm-btn--primary pm-btn--finish ${
-                      !canFinish || finishing ? "pm-btn--disabled" : ""
-                    }`}
+                    className={`pm-btn pm-btn--primary pm-btn--finish ${!canFinish || finishing ? "pm-btn--disabled" : ""}`}
                     onClick={handleFinish}
                     disabled={!canFinish || finishing}
                   >
@@ -665,8 +690,8 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                 Mantenimiento.
                 <br />
                 - Los puntos con <strong>NO OK</strong> deben tener comentario obligatorio.
-                <br />- Si el sistema detecta que el punto requiere <strong>medición</strong>,
-                deberás capturar el valor.
+                <br />- Si el sistema detecta que el punto requiere <strong>medición</strong>, deberás
+                capturar el valor.
               </p>
             </div>
 

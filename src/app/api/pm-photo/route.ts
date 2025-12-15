@@ -1,17 +1,16 @@
-// src/app/api/pm-photo/route.ts
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { Buffer } from "buffer";
 
 export const runtime = "nodejs";
-// (Opcional) evita cache raro en routes
 export const dynamic = "force-dynamic";
+
+// ✅ solo aceptamos JPG/PNG para asegurar compatibilidad con pdf-lib
+const ALLOWED_TYPES = ["image/jpeg", "image/png"];
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
-
-    // El front debe mandar el archivo como "file"
     const file = formData.get("file") as File | null;
 
     if (!file) {
@@ -21,10 +20,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validación básica
-    if (!file.type?.startsWith("image/")) {
+    console.log("📸 Foto recibida:", {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
+
+    if (!ALLOWED_TYPES.includes((file.type || "").toLowerCase())) {
       return NextResponse.json(
-        { ok: false, error: "El archivo debe ser una imagen" },
+        {
+          ok: false,
+          error: "Formato de imagen no soportado",
+          details: "Sube JPG o PNG (si viene de iPhone en HEIC, el front debe convertir a JPG).",
+          receivedType: file.type,
+        },
         { status: 400 }
       );
     }
@@ -34,22 +43,18 @@ export async function POST(req: Request) {
 
     const timestamp = Date.now();
     const safeName = (file.name || "foto_pm.jpg").replace(/[^\w.-]+/g, "_");
-
     const blobName = `pm-photos/${timestamp}-${safeName}`;
 
     const blob = await put(blobName, buffer, {
       access: "public",
-      contentType: file.type || "image/jpeg",
+      contentType: file.type,
     });
 
-    return NextResponse.json({
-      ok: true,
-      url: blob.url,
-    });
-  } catch (err) {
-    console.error("Error en /api/pm-photo:", err);
+    return NextResponse.json({ ok: true, url: blob.url });
+  } catch (err: any) {
+    console.error("💥 Error en /api/pm-photo:", err);
     return NextResponse.json(
-      { ok: false, error: "No se pudo subir la foto" },
+      { ok: false, error: "No se pudo subir la foto", details: err?.message || String(err) },
       { status: 500 }
     );
   }
