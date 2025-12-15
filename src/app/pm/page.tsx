@@ -124,7 +124,8 @@ export default function PMSelectionPage() {
       return;
     }
 
-    const selected = pmFiles.find((pm) => pm.id === selectedPmId);
+    const selected = pmFiles.find((pm) => (pm.uploadedFileId ?? pm.id) === selectedPmId);
+
     if (!selected) {
       setStartError("No se encontró la información del PM seleccionado.");
       return;
@@ -378,38 +379,35 @@ export default function PMSelectionPage() {
 
             {!loading && filteredPmFiles.length > 0 && (
               <div className="baja-pm-list">
-                {filteredPmFiles.map((pm) => (
-                  <label
-                    key={pm.id}
-                    className={`baja-pm-list-row ${
-                      selectedPmId === pm.id ? "baja-pm-list-row-active" : ""
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="pmSelected"
-                      className="baja-pm-radio"
-                      checked={selectedPmId === pm.id}
-                      onChange={() => setSelectedPmId(pm.id)}
-                    />
-                    <div className="baja-pm-list-main">
-                      <div className="baja-pm-list-name">{pm.fileName}</div>
-                      <div className="baja-pm-list-id">
-                        ID: <span>{pm.id}</span>{" "}
-                        {pm.pmTemplateId ? (
-                          <span style={{ marginLeft: 8, opacity: 0.8 }}>
-                            (template OK)
-                          </span>
-                        ) : (
-                          <span style={{ marginLeft: 8, opacity: 0.8 }}>
-                            (se generará al iniciar)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="baja-pm-list-origin">Nube Frida</div>
-                  </label>
-                ))}
+                {filteredPmFiles.map((pm) => {
+  const rowId = pm.uploadedFileId ?? pm.id; // ✅ usa algo seguro
+
+  return (
+    <label
+      key={rowId}
+      onClick={() => setSelectedPmId(rowId)}
+      className={`baja-pm-list-row ${selectedPmId === rowId ? "baja-pm-list-row-active" : ""}`}
+      style={{ cursor: "pointer" }}
+    >
+      <input
+        type="radio"
+        name="pmSelected"
+        className="baja-pm-radio"
+        value={rowId}
+        checked={selectedPmId === rowId}
+        onChange={() => setSelectedPmId(rowId)}
+      />
+      <div className="baja-pm-list-main">
+        <div className="baja-pm-list-name">{pm.fileName}</div>
+        <div className="baja-pm-list-id">
+          ID: <span>{rowId}</span>
+        </div>
+      </div>
+      <div className="baja-pm-list-origin">Nube Frida</div>
+    </label>
+  );
+})}
+
               </div>
             )}
           </section>
