@@ -13,6 +13,7 @@ export async function GET() {
     });
 
     const items = files.map((f) => ({
+      id: f.id,
       // ✅ el ID de selección SIEMPRE es el uploadedFileId
       uploadedFileId: f.id,
 

@@ -130,7 +130,10 @@ export default function PMSelectionPage() {
       return;
     }
 
-    const selected = pmFiles.find((pm) => pm.id === selectedPmId);
+    const selected = pmFiles.find(
+  (pm) => (pm.uploadedFileId || pm.id) === selectedPmId
+);
+
     if (!selected) {
       setStartError("No se encontró la información del PM seleccionado.");
       return;
@@ -394,8 +397,9 @@ export default function PMSelectionPage() {
                       type="radio"
                       name="pmSelected"
                       className="baja-pm-radio"
-                      checked={selectedPmId === pm.id}
-                      onChange={() => setSelectedPmId(pm.id)}
+                      checked={selectedPmId === (pm.uploadedFileId || pm.id)}
+onChange={() => setSelectedPmId(pm.uploadedFileId || pm.id)}
+
                     />
 
                     <div className="baja-pm-list-main">
