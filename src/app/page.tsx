@@ -14,6 +14,9 @@ export default function Home() {
         <li>
           <Link href="/admin">Ir al módulo de Frida (/admin)</Link>
         </li>
+        <li>
+          <Link href="/gl">Ir al módulo de GLs (/gl)</Link>
+        </li>
       </ul>
     </main>
   );
