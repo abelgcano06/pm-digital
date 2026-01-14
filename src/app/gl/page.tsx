@@ -13,16 +13,14 @@ type PMItem = {
   pmStatus?: "OPEN" | "COMPLETED" | "CLOSED";
   uploadedAt?: string;
 
-  hasTemplate?: boolean;
-  templateId?: string | null;
-
   pmNumber?: string | null;
   pmName?: string | null;
   assetCode?: string | null;
   location?: string | null;
 
-  // opcional si lo agregas luego:
+  // ✅ NUEVO
   executionPdfUrl?: string | null;
+  lastExecutionFinishedAt?: string | null;
 };
 
 const GL_OPTIONS = [
@@ -43,7 +41,8 @@ export default function GLDashboardPage() {
 
   const [glFilter, setGlFilter] = useState<string>(GL_OPTIONS[0]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "OPEN" | "COMPLETED" | "CLOSED">("all");
+  const [statusFilter, setStatusFilter] =
+    useState<"all" | "OPEN" | "COMPLETED" | "CLOSED">("all");
 
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -53,11 +52,15 @@ export default function GLDashboardPage() {
       setLoading(true);
       setErr(null);
 
-      // Reutilizamos /api/pm-files porque ya trae glOwner/pmType/pmStatus
       const res = await fetch("/api/pm-files", { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
 
-      const arr: any[] = Array.isArray(json?.items) ? json.items : Array.isArray(json) ? json : [];
+      const arr: any[] = Array.isArray(json?.items)
+        ? json.items
+        : Array.isArray(json)
+        ? json
+        : [];
+
       setItems(arr as PMItem[]);
     } catch (e: any) {
       console.error(e);
@@ -74,7 +77,7 @@ export default function GLDashboardPage() {
 
   const filtered = useMemo(() => {
     return items
-      .filter((x) => ((x.glOwner || "").toLowerCase() === glFilter.toLowerCase()))
+      .filter((x) => (x.glOwner || "").toLowerCase() === glFilter.toLowerCase())
       .filter((x) => {
         if (!search.trim()) return true;
         const s = search.toLowerCase();
@@ -98,11 +101,19 @@ export default function GLDashboardPage() {
         body: JSON.stringify({ uploadedFileId, status }),
       });
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "No se pudo actualizar el status");
+      const data = await res.json().catch(() => ({} as any));
+
+      if (!res.ok || !data?.ok) {
+        const msg = data?.error || "No se puede actualizar el status";
+        const details = data?.details ? `\n${data.details}` : "";
+        const current = data?.currentStatus ? `\nStatus actual: ${data.currentStatus}` : "";
+        throw new Error(msg + current + details);
+      }
 
       setItems((prev) =>
-        prev.map((x) => (x.uploadedFileId === uploadedFileId ? { ...x, pmStatus: status } : x))
+        prev.map((x) =>
+          x.uploadedFileId === uploadedFileId ? { ...x, pmStatus: status } : x
+        )
       );
     } catch (e: any) {
       console.error(e);
@@ -128,7 +139,8 @@ export default function GLDashboardPage() {
           <div className="gl-chip">GL DASHBOARD • Revisión</div>
           <h1 className="gl-title">PMs asignados</h1>
           <p className="gl-subtitle">
-            Selecciona tu nombre y revisa los PMs completados por los asociados. Aquí puedes cerrar el PM.
+            Aquí ves los PMs asignados a tu nombre. Puedes ver el PDF original y el PDF de ejecución,
+            y cerrar el PM cuando ya lo revisaste.
           </p>
           <div className="gl-meta">
             <span className="gl-meta-time">{nowLabel}</span>
@@ -148,7 +160,9 @@ export default function GLDashboardPage() {
           <div className="gl-card-head">
             <div>
               <h2 className="gl-card-title">Filtros</h2>
-              <p className="gl-card-help">Esto solo muestra PMs cuyo GL sea exactamente el seleccionado.</p>
+              <p className="gl-card-help">
+                Solo se muestran PMs donde <strong>GL Owner</strong> coincide exactamente con el GL seleccionado.
+              </p>
             </div>
           </div>
 
@@ -206,10 +220,14 @@ export default function GLDashboardPage() {
 
               {filtered.map((pm) => {
                 const busy = actionBusyId === pm.uploadedFileId;
-
                 const status = pm.pmStatus || "OPEN";
+
                 const statusClass =
-                  status === "COMPLETED" ? "tag tag-completed" : status === "CLOSED" ? "tag tag-closed" : "tag tag-open";
+                  status === "COMPLETED"
+                    ? "tag tag-completed"
+                    : status === "CLOSED"
+                    ? "tag tag-closed"
+                    : "tag tag-open";
 
                 const dateLabel = pm.uploadedAt
                   ? new Intl.DateTimeFormat("es-MX", { year: "numeric", month: "short", day: "2-digit" }).format(
@@ -239,30 +257,27 @@ export default function GLDashboardPage() {
                     <div className="gl-col-date">{dateLabel}</div>
 
                     <div className="gl-col-actions">
+                      <button className="gl-btn gl-btn-ghost" onClick={() => window.open(pm.blobUrl, "_blank")}>
+                        Ver PDF original
+                      </button>
+
                       <button
                         className="gl-btn gl-btn-ghost"
-                        onClick={() => window.open(pm.blobUrl, "_blank")}
+                        disabled={!pm.executionPdfUrl}
+                        title={!pm.executionPdfUrl ? "Aún no existe PDF de ejecución" : "Abrir PDF de ejecución"}
+                        onClick={() => pm.executionPdfUrl && window.open(pm.executionPdfUrl, "_blank")}
                       >
-                        Ver PDF base
+                        Ver PDF ejecución
                       </button>
 
                       {status === "COMPLETED" && (
-                        <button
-                          className="gl-btn gl-btn-primary"
-                          disabled={busy}
-                          onClick={() => setStatus(pm.uploadedFileId, "CLOSED")}
-                        >
+                        <button className="gl-btn gl-btn-primary" disabled={busy} onClick={() => setStatus(pm.uploadedFileId, "CLOSED")}>
                           {busy ? "Cerrando..." : "Cerrar (CLOSED)"}
                         </button>
                       )}
 
                       {status === "CLOSED" && (
-                        <button
-                          className="gl-btn gl-btn-secondary"
-                          disabled={busy}
-                          onClick={() => setStatus(pm.uploadedFileId, "OPEN")}
-                          title="Opcional: reabrir"
-                        >
+                        <button className="gl-btn gl-btn-secondary" disabled={busy} onClick={() => setStatus(pm.uploadedFileId, "OPEN")}>
                           {busy ? "Reabriendo..." : "Reabrir (OPEN)"}
                         </button>
                       )}

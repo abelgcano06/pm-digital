@@ -4,26 +4,17 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const glOwner = (searchParams.get("glOwner") || "").trim();
-
-    const where: any = { active: true };
-    if (glOwner && glOwner !== "all") {
-      // Guardamos glOwner como texto (normalmente en minúsculas o como lo escribió Frida).
-      // Para evitar problemas por mayúsculas, lo comparamos en lower.
-      where.glOwner = glOwner;
-    }
-
     const files = await prisma.pMUploadedFile.findMany({
-      where,
+      where: { active: true },
       include: {
         template: {
           include: {
             executions: {
               orderBy: { finishedAt: "desc" },
-              take: 1, // 👈 solo la última ejecución (para el PDF más reciente)
+              take: 1,
+              select: { id: true, executionPdfUrl: true, finishedAt: true },
             },
           },
         },
@@ -35,7 +26,7 @@ export async function GET(req: Request) {
       const lastExec = f.template?.executions?.[0] ?? null;
 
       return {
-        // ✅ ID de selección: el uploadedFileId (PMUploadedFile.id)
+        // ✅ el ID de selección es el uploadedFileId
         uploadedFileId: f.id,
 
         fileName: f.fileName,
@@ -46,18 +37,19 @@ export async function GET(req: Request) {
         pmStatus: f.pmStatus,
         uploadedAt: f.uploadedAt,
 
-        // template
+        // Template info
         hasTemplate: !!f.template,
         templateId: f.template?.id ?? null,
+
         pmNumber: f.template?.pmNumber ?? null,
         pmName: f.template?.name ?? null,
         assetCode: f.template?.assetCode ?? null,
         location: f.template?.location ?? null,
 
-        // ✅ ÚLTIMA EJECUCIÓN (PDF CIERRE)
+        // ✅ NUEVO: PDF de ejecución (último)
         lastExecutionId: lastExec?.id ?? null,
-        lastExecutionPdfUrl: lastExec?.executionPdfUrl ?? null,
-        lastFinishedAt: lastExec?.finishedAt ?? null,
+        executionPdfUrl: lastExec?.executionPdfUrl ?? null,
+        lastExecutionFinishedAt: lastExec?.finishedAt ?? null,
       };
     });
 
