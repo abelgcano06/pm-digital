@@ -1,57 +1,50 @@
+// src/app/api/pm-files/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const scope = url.searchParams.get("scope"); // "associate" o null
+
+    const where: any = { active: true };
+
+    // ✅ Para asociados: solo OPEN
+    if (scope === "associate") {
+      where.pmStatus = "OPEN";
+    }
+
     const files = await prisma.pMUploadedFile.findMany({
-      where: { active: true },
-      include: {
-        template: {
-          include: {
-            executions: {
-              orderBy: { finishedAt: "desc" },
-              take: 1,
-              select: { id: true, executionPdfUrl: true, finishedAt: true },
-            },
-          },
-        },
-      },
+      where,
+      include: { template: true },
       orderBy: { uploadedAt: "desc" },
     });
 
-    const items = files.map((f) => {
-      const lastExec = f.template?.executions?.[0] ?? null;
+    const items = files.map((f) => ({
+      uploadedFileId: f.id,
+      fileName: f.fileName,
+      blobUrl: f.blobUrl,
 
-      return {
-        // ✅ el ID de selección es el uploadedFileId
-        uploadedFileId: f.id,
+      glOwner: f.glOwner,
+      pmType: f.pmType,
+      pmStatus: f.pmStatus,
+      uploadedAt: f.uploadedAt,
 
-        fileName: f.fileName,
-        blobUrl: f.blobUrl,
+      hasTemplate: !!f.template,
+      templateId: f.template?.id ?? null,
 
-        glOwner: f.glOwner,
-        pmType: f.pmType,
-        pmStatus: f.pmStatus,
-        uploadedAt: f.uploadedAt,
+      pmNumber: f.template?.pmNumber ?? null,
+      pmName: f.template?.name ?? null,
+      assetCode: f.template?.assetCode ?? null,
+      location: f.template?.location ?? null,
 
-        // Template info
-        hasTemplate: !!f.template,
-        templateId: f.template?.id ?? null,
-
-        pmNumber: f.template?.pmNumber ?? null,
-        pmName: f.template?.name ?? null,
-        assetCode: f.template?.assetCode ?? null,
-        location: f.template?.location ?? null,
-
-        // ✅ NUEVO: PDF de ejecución (último)
-        lastExecutionId: lastExec?.id ?? null,
-        executionPdfUrl: lastExec?.executionPdfUrl ?? null,
-        lastExecutionFinishedAt: lastExec?.finishedAt ?? null,
-      };
-    });
+      // ✅ Para UI del asociado
+      pmTemplateId: f.template?.id ?? null,
+      id: f.id, // para que tu UI siga usando pm.id
+    }));
 
     return NextResponse.json({ items });
   } catch (err: any) {

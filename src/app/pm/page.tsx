@@ -80,7 +80,8 @@ export default function PMSelectionPage() {
         setLoading(true);
         setLoadingError(null);
 
-        const res = await fetch("/api/pm-files", { cache: "no-store" });
+        const res = await fetch("/api/pm-files?scope=associate", { cache: "no-store" });
+
         if (!res.ok) throw new Error("No se pudo cargar la lista de PMs");
 
         const json = await res.json();

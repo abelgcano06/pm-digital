@@ -1,8 +1,8 @@
+// src/app/pm/[id]/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import heic2any from "heic2any";
 import "./pm-execution.css";
 
 type PMTaskTemplate = {
@@ -34,40 +34,8 @@ type TaskExecution = {
   comment: string;
   flagged: boolean;
   measureValue?: string;
-
-  // ✅ fotos por tarea (URLs públicas en Vercel Blob)
   photoUrls: string[];
 };
-
-// ✅ Convierte HEIC/HEIF → JPG en el cliente
-async function normalizeImage(file: File): Promise<File> {
-  const t = (file.type || "").toLowerCase();
-
-  if (t === "image/heic" || t === "image/heif") {
-    const blob = (await heic2any({
-      blob: file,
-      toType: "image/jpeg",
-      quality: 0.9,
-    })) as Blob;
-
-    const newName = (file.name || "foto.heic").replace(/\.(heic|heif)$/i, ".jpg");
-    return new File([blob], newName, { type: "image/jpeg" });
-  }
-
-  // A veces iOS manda type vacío pero el nombre termina en .heic
-  if ((file.name || "").toLowerCase().endsWith(".heic") || (file.name || "").toLowerCase().endsWith(".heif")) {
-    const blob = (await heic2any({
-      blob: file,
-      toType: "image/jpeg",
-      quality: 0.9,
-    })) as Blob;
-
-    const newName = (file.name || "foto.heic").replace(/\.(heic|heif)$/i, ".jpg");
-    return new File([blob], newName, { type: "image/jpeg" });
-  }
-
-  return file;
-}
 
 export default function PMExecutionPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
@@ -201,14 +169,14 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     if (currentTaskExec.status === "pending") return false;
 
     if (currentTaskExec.flagged && !currentTaskExec.comment.trim()) return false;
-    if (currentTaskExec.status === "nok" && !currentTaskExec.comment.trim()) return false;
+    if (currentTaskExec.status === "nok" && !currentTaskExec.comment.trim())
+      return false;
 
     if (requiresMeasure) {
       if (!currentTaskExec.measureValue || !currentTaskExec.measureValue.trim()) {
         return false;
       }
     }
-
     return true;
   };
 
@@ -223,7 +191,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     if (currentIndex > 0) setCurrentIndex((i) => i - 1);
   };
 
-  // ✅ SUBIR FOTO(S) PARA LA TAREA ACTUAL (con conversión HEIC→JPG)
+  // ✅ SUBIR FOTO(S) PARA LA TAREA ACTUAL
   async function uploadPhotos(files: FileList | null) {
     if (!files || files.length === 0) return;
     if (!currentTaskTemplate || !currentTaskExec) return;
@@ -232,15 +200,9 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     setUploadingPhoto(true);
 
     try {
-      // ⚠️ importante: no uses currentTaskExec directamente dentro del loop para el append
-      // porque el state puede quedar "stale". Mejor ir acumulando aquí:
-      let newUrls: string[] = [...(currentTaskExec.photoUrls || [])];
-
       for (const file of Array.from(files)) {
-        const normalized = await normalizeImage(file);
-
         const fd = new FormData();
-        fd.append("file", normalized);
+        fd.append("file", file);
 
         const res = await fetch("/api/pm-photo", {
           method: "POST",
@@ -255,11 +217,15 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
           throw new Error(msg + details);
         }
 
-        newUrls.push(data.url);
+        // importante: usa el estado actual “real”
+        setTasksExec((prev) =>
+          prev.map((t) =>
+            t.taskId === currentTaskTemplate.id
+              ? { ...t, photoUrls: [...(t.photoUrls || []), data.url] }
+              : t
+          )
+        );
       }
-
-      // ✅ actualizar una sola vez al final
-      updateCurrentExec({ photoUrls: newUrls });
     } catch (e: any) {
       console.error(e);
       setPhotoError(e?.message || "Error subiendo foto");
@@ -270,10 +236,14 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
   }
 
   function removePhoto(url: string) {
-    if (!currentTaskExec) return;
-    updateCurrentExec({
-      photoUrls: (currentTaskExec.photoUrls || []).filter((u) => u !== url),
-    });
+    if (!currentTaskTemplate) return;
+    setTasksExec((prev) =>
+      prev.map((t) =>
+        t.taskId === currentTaskTemplate.id
+          ? { ...t, photoUrls: (t.photoUrls || []).filter((u) => u !== url) }
+          : t
+      )
+    );
   }
 
   const canFinish = useMemo(() => {
@@ -298,9 +268,13 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     return true;
   }, [pmTemplate, tasksExec, counts.pending]);
 
+  // ✅ FIX iOS: abrir pestaña en blanco EN EL MISMO CLICK
   const handleFinish = async () => {
     if (!pmTemplate) return;
     if (!canFinish) return;
+
+    // ✅ abre “about:blank” en el gesto del click (evita popup blocker de iOS)
+    const pdfWindow = window.open("about:blank", "_blank");
 
     try {
       setFinishing(true);
@@ -318,7 +292,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         glNombre: glNombre || "SIN GL",
         startedAt: startedAt || now,
         finishedAt: now,
-        tasks: tasksExec, // ✅ incluye photoUrls por tarea
+        tasks: tasksExec, // ✅ incluye photoUrls
       };
 
       const res = await fetch("/api/pm-finish", {
@@ -328,26 +302,36 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       });
 
       if (!res.ok) {
-  // Intentar leer JSON primero (tu API normalmente regresa JSON)
-  let payload: any = null;
-  try {
-    payload = await res.json();
-  } catch {
-    // si no fue JSON, caer a texto
-    const txt = await res.text();
-    throw new Error(txt || "Error al generar el PDF (respuesta no-JSON).");
-  }
-
-  const msg = payload?.error || "Error al generar el PDF.";
-  const details = payload?.details ? `\n${payload.details}` : "";
-  const extra = payload?.receivedType ? `\nreceivedType: ${payload.receivedType}` : "";
-  throw new Error(msg + details + extra);
-}
-
+        const raw = await res.text();
+        let msg = "Error al generar el PDF.";
+        try {
+          const j = JSON.parse(raw);
+          msg =
+            (j?.error ? j.error : msg) +
+            (j?.details ? `\n${j.details}` : "") +
+            (j?.rawSample ? `\nrawSample: ${j.rawSample}` : "");
+        } catch {
+          msg = msg + `\n${raw.slice(0, 800)}`;
+        }
+        // si ya abrimos ventana, la cerramos
+        if (pdfWindow && !pdfWindow.closed) pdfWindow.close();
+        throw new Error(msg);
+      }
 
       const data = await res.json();
-      if (!data?.url) throw new Error("La respuesta no incluye la URL del PDF.");
-      window.open(data.url, "_blank");
+      if (!data?.url) {
+        if (pdfWindow && !pdfWindow.closed) pdfWindow.close();
+        throw new Error("La respuesta no incluye la URL del PDF.");
+      }
+
+      // ✅ redirige la pestaña que abrimos en blanco
+      if (pdfWindow && !pdfWindow.closed) {
+        pdfWindow.location.href = data.url;
+        pdfWindow.focus();
+      } else {
+        // fallback si iOS la bloqueó
+        window.location.href = data.url;
+      }
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "No se pudo generar el PDF. Intenta de nuevo.");
@@ -390,9 +374,13 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   Asociado 1: {asociado1 || "SIN NOMBRE"}
                 </span>
                 {asociado2 && (
-                  <span className="pm-badge pm-badge-chip">Asociado 2: {asociado2}</span>
+                  <span className="pm-badge pm-badge-chip">
+                    Asociado 2: {asociado2}
+                  </span>
                 )}
-                <span className="pm-badge pm-badge-chip">GL: {glNombre || "SIN GL"}</span>
+                <span className="pm-badge pm-badge-chip">
+                  GL: {glNombre || "SIN GL"}
+                </span>
               </div>
             </div>
           </div>
@@ -494,20 +482,20 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     </div>
                   )}
 
-                  {/* ✅ BLOQUE FOTOS */}
+                  {/* Fotos */}
                   <div className="pm-comments-block">
                     <span className="pm-comments-label">Evidencia (fotos)</span>
 
                     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      {/* input ocultable (pero lo dejamos visible por si quieres) */}
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/heic,image/heif"
                         capture="environment"
                         multiple
                         onChange={(e) => uploadPhotos(e.target.files)}
                         disabled={uploadingPhoto}
+                        style={{ display: "none" }}
                       />
 
                       <button
@@ -579,8 +567,8 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     />
                     {(currentTaskExec.flagged || currentTaskExec.status === "nok" || requiresMeasure) && (
                       <p className="pm-help-error">
-                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la medición son
-                        obligatorios para continuar.
+                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la
+                        medición son obligatorios para continuar.
                       </p>
                     )}
                   </div>
@@ -609,25 +597,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   </div>
                 </footer>
 
-                <div className="pm-progress-block">
-                  <div className="pm-progress-row">
-                    <span className="pm-progress-label">PROGRESO</span>
-                    <span className="pm-progress-value">
-                      {counts.total > 0 ? `${counts.ok + counts.nok}/${counts.total}` : "0/0"} puntos
-                    </span>
-                  </div>
-                  <div className="pm-progress-row">
-                    <span className="pm-progress-label">FLAGS</span>
-                    <span className="pm-progress-value">{counts.flagged}</span>
-                  </div>
-                </div>
-
                 <div className="pm-finish-block">
-                  <div className="pm-legend">
-                    <span>OK: punto correcto</span>
-                    <span>NO OK: punto con desviación</span>
-                    <span>FLAG: requiere revisión del GL / Mtto</span>
-                  </div>
                   <button
                     type="button"
                     className={`pm-btn pm-btn--primary pm-btn--finish ${!canFinish || finishing ? "pm-btn--disabled" : ""}`}
@@ -640,78 +610,6 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
               </div>
             )}
           </section>
-
-          <aside className="pm-card pm-card-side">
-            <div className="pm-side-section">
-              <h3 className="pm-side-title">Resumen del PM</h3>
-              <div className="pm-side-stats">
-                <div className="pm-side-stat">
-                  <span className="pm-side-stat-label">Total puntos</span>
-                  <span className="pm-side-stat-value">{counts.total}</span>
-                </div>
-                <div className="pm-side-stat">
-                  <span className="pm-side-stat-label">OK</span>
-                  <span className="pm-side-stat-value pm-side-stat-ok">{counts.ok}</span>
-                </div>
-                <div className="pm-side-stat">
-                  <span className="pm-side-stat-label">NO OK</span>
-                  <span className="pm-side-stat-value pm-side-stat-nok">{counts.nok}</span>
-                </div>
-                <div className="pm-side-stat">
-                  <span className="pm-side-stat-label">Pendientes</span>
-                  <span className="pm-side-stat-value pm-side-stat-pending">{counts.pending}</span>
-                </div>
-                <div className="pm-side-stat">
-                  <span className="pm-side-stat-label">FLAGS</span>
-                  <span className="pm-side-stat-value pm-side-stat-flag">{counts.flagged}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pm-side-section">
-              <p className="pm-side-section-title">Navegación por puntos</p>
-              <div className="pm-steps-grid">
-                {tasksArray.map((task, idx) => {
-                  const exec = tasksExec.find((t) => t.taskId === task.id);
-                  let statusClass = "pm-step--pending";
-                  if (exec?.status === "ok") statusClass = "pm-step--ok";
-                  else if (exec?.status === "nok") statusClass = "pm-step--nok";
-                  if (exec?.flagged) statusClass = "pm-step--flag";
-
-                  const isCurrent = idx === currentIndex;
-
-                  return (
-                    <button
-                      key={task.id}
-                      type="button"
-                      className={`pm-step ${statusClass} ${isCurrent ? "pm-step--current" : ""}`}
-                      onClick={() => setCurrentIndex(idx)}
-                    >
-                      <span className="pm-step-index">{idx + 1}</span>
-                      <span className="pm-step-id">{task.taskIdNumber}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="pm-side-section">
-              <p className="pm-side-section-title">Notas</p>
-              <p className="pm-side-text">
-                - Marca los puntos con <strong>FLAG</strong> cuando requieran revisión del GL o de
-                Mantenimiento.
-                <br />
-                - Los puntos con <strong>NO OK</strong> deben tener comentario obligatorio.
-                <br />- Si el sistema detecta que el punto requiere <strong>medición</strong>, deberás
-                capturar el valor.
-              </p>
-            </div>
-
-            <div className="pm-side-footnote">
-              Cuando termines todos los puntos y no haya pendientes, el botón de{" "}
-              <strong>“Finalizar y generar PDF”</strong> se habilitará automáticamente.
-            </div>
-          </aside>
         </div>
       </main>
     </div>
