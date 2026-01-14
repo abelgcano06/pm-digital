@@ -1,47 +1,67 @@
-// src/app/api/pm-files/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const glOwner = (searchParams.get("glOwner") || "").trim();
+
+    const where: any = { active: true };
+    if (glOwner && glOwner !== "all") {
+      // Guardamos glOwner como texto (normalmente en minúsculas o como lo escribió Frida).
+      // Para evitar problemas por mayúsculas, lo comparamos en lower.
+      where.glOwner = glOwner;
+    }
+
     const files = await prisma.pMUploadedFile.findMany({
-      where: { active: true },
-      include: { template: true },
+      where,
+      include: {
+        template: {
+          include: {
+            executions: {
+              orderBy: { finishedAt: "desc" },
+              take: 1, // 👈 solo la última ejecución (para el PDF más reciente)
+            },
+          },
+        },
+      },
       orderBy: { uploadedAt: "desc" },
     });
 
-    const items = files.map((f) => ({
-      // ✅ Lo que el front usa para seleccionar
-      id: f.id,
+    const items = files.map((f) => {
+      const lastExec = f.template?.executions?.[0] ?? null;
 
-      // ✅ Si quieres mantener ambos, que sean iguales
-      uploadedFileId: f.id,
+      return {
+        // ✅ ID de selección: el uploadedFileId (PMUploadedFile.id)
+        uploadedFileId: f.id,
 
-      fileName: f.fileName,
-      blobUrl: f.blobUrl,
+        fileName: f.fileName,
+        blobUrl: f.blobUrl,
 
-      glOwner: f.glOwner ?? "",
-      pmType: f.pmType ?? "",
-      pmStatus: f.pmStatus,
-      uploadedAt: f.uploadedAt,
+        glOwner: f.glOwner,
+        pmType: f.pmType,
+        pmStatus: f.pmStatus,
+        uploadedAt: f.uploadedAt,
 
-      // ✅ el front espera pmTemplateId (no templateId)
-      pmTemplateId: f.template?.id ?? null,
+        // template
+        hasTemplate: !!f.template,
+        templateId: f.template?.id ?? null,
+        pmNumber: f.template?.pmNumber ?? null,
+        pmName: f.template?.name ?? null,
+        assetCode: f.template?.assetCode ?? null,
+        location: f.template?.location ?? null,
 
-      // info opcional del template
-      pmNumber: f.template?.pmNumber ?? null,
-      pmName: f.template?.name ?? null,
-      assetCode: f.template?.assetCode ?? null,
-      location: f.template?.location ?? null,
-    }));
+        // ✅ ÚLTIMA EJECUCIÓN (PDF CIERRE)
+        lastExecutionId: lastExec?.id ?? null,
+        lastExecutionPdfUrl: lastExec?.executionPdfUrl ?? null,
+        lastFinishedAt: lastExec?.finishedAt ?? null,
+      };
+    });
 
-    const res = NextResponse.json({ items });
-    res.headers.set("Cache-Control", "no-store, max-age=0");
-    return res;
+    return NextResponse.json({ items });
   } catch (err: any) {
     console.error("💥 Error en /api/pm-files:", err);
     return NextResponse.json(
