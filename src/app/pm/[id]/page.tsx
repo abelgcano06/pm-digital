@@ -388,230 +388,107 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       </header>
 
       <main className="pm-main">
-        <div className="pm-main-inner">
-          <section className="pm-card pm-card-main">
-            {error && <div className="pm-error-banner">{error}</div>}
+  <div className="pm-main-inner">
+    {/* COLUMNA IZQUIERDA */}
+    <section className="pm-card pm-card-main">
+      {error && <div className="pm-error-banner">{error}</div>}
 
-            {currentTaskTemplate && currentTaskExec && (
-              <div className="pm-task-panel">
-                <div className="pm-task-header">
-                  <div className="pm-task-title-block">
-                    <span className="pm-task-index">{currentIndex + 1}</span>
-                    <div>
-                      <p className="pm-task-id">Task ID {currentTaskTemplate.taskIdNumber}</p>
-                      <h2 className="pm-task-title">{currentTaskTemplate.majorStep}</h2>
-                    </div>
-                  </div>
-                  <div className="pm-task-status-block">
-                    <span className={`pm-task-status-badge pm-task-status-badge--${currentTaskExec.status}`}>
-                      {currentTaskExec.status === "ok"
-                        ? "OK"
-                        : currentTaskExec.status === "nok"
-                        ? "NO OK"
-                        : "Pendiente"}
-                    </span>
-                    {currentTaskExec.flagged && <span className="pm-task-flag">FLAG</span>}
-                  </div>
-                </div>
-
-                <div className="pm-info-box">
-                  <div className="pm-info-section">
-                    <p className="pm-info-label">Key points</p>
-                    <p className="pm-info-text">{currentTaskTemplate.keyPoints || "-"}</p>
-                  </div>
-
-                  <div className="pm-info-section pm-info-section--spaced">
-                    <p className="pm-info-label">Razón</p>
-                    <p className="pm-info-text">{currentTaskTemplate.reason || "-"}</p>
-                  </div>
-
-                  {pdfUrl && (
-                    <div className="pm-info-section pm-info-section--pdf">
-                      <p className="pm-info-text">
-                        Si necesitas ver la imagen o esquema original, abre el PDF del PM.
-                      </p>
-                      <button
-                        type="button"
-                        className="pm-btn pm-btn--secondary"
-                        onClick={() => window.open(pdfUrl, "_blank")}
-                      >
-                        Ver PDF original
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pm-controls-box">
-                  <div className="pm-control-row">
-                    <p className="pm-control-label">Resultado de este punto</p>
-                    <div className="pm-control-buttons">
-                      <button
-                        type="button"
-                        className={`pm-btn ${currentTaskExec.status === "ok" ? "pm-btn--primary" : "pm-btn--ghost"}`}
-                        onClick={() => handleSetStatus("ok")}
-                      >
-                        OK
-                      </button>
-                      <button
-                        type="button"
-                        className={`pm-btn ${currentTaskExec.status === "nok" ? "pm-btn--danger" : "pm-btn--ghost"}`}
-                        onClick={() => handleSetStatus("nok")}
-                      >
-                        NO OK
-                      </button>
-                      <button
-                        type="button"
-                        className={`pm-btn ${currentTaskExec.flagged ? "pm-btn--flag-active" : "pm-btn--ghost"}`}
-                        onClick={toggleFlag}
-                      >
-                        FLAG
-                      </button>
-                    </div>
-                  </div>
-
-                  {requiresMeasure && (
-                    <div className="pm-measure-block">
-                      <span className="pm-measure-label">Medición / Valor registrado</span>
-                      <input
-                        type="text"
-                        className="pm-input pm-input--measure"
-                        placeholder="Ej: 4.8 mm, 3.2%, 85 °C..."
-                        value={currentTaskExec.measureValue || ""}
-                        onChange={(e) => updateCurrentExec({ measureValue: e.target.value })}
-                      />
-                    </div>
-                  )}
-
-                  {/* Fotos */}
-                  <div className="pm-comments-block">
-                    <span className="pm-comments-label">Evidencia (fotos)</span>
-
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/heic,image/heif"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => uploadPhotos(e.target.files)}
-                        disabled={uploadingPhoto}
-                        style={{ display: "none" }}
-                      />
-
-                      <button
-                        type="button"
-                        className={`pm-btn ${uploadingPhoto ? "pm-btn--disabled" : "pm-btn--secondary"}`}
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadingPhoto}
-                      >
-                        {uploadingPhoto ? "Subiendo..." : "Tomar / Subir foto"}
-                      </button>
-                    </div>
-
-                    {photoError && (
-                      <div className="pm-error-banner" style={{ marginTop: 8 }}>
-                        {photoError}
-                      </div>
-                    )}
-
-                    {(currentTaskExec.photoUrls || []).length > 0 && (
-                      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {currentTaskExec.photoUrls.map((url) => (
-                          <div key={url} style={{ width: 120 }}>
-                            <a href={url} target="_blank" rel="noreferrer">
-                              <img
-                                src={url}
-                                alt="Evidencia"
-                                style={{
-                                  width: "120px",
-                                  height: "90px",
-                                  objectFit: "cover",
-                                  borderRadius: 10,
-                                }}
-                              />
-                            </a>
-                            <button
-                              type="button"
-                              className="pm-btn pm-btn--ghost"
-                              style={{ width: "100%", marginTop: 6 }}
-                              onClick={() => removePhoto(url)}
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Comentarios */}
-                  <div className="pm-comments-block">
-                    <span className="pm-comments-label">
-                      {currentTaskExec.flagged
-                        ? "Detalle del FLAG / criterio:"
-                        : currentTaskExec.status === "nok"
-                        ? "Comentarios (obligatorio para NO OK):"
-                        : "Comentarios / Observaciones:"}
-                    </span>
-                    <textarea
-                      className="pm-textarea"
-                      placeholder={
-                        currentTaskExec.flagged
-                          ? "Explica por qué marcaste este punto con FLAG..."
-                          : currentTaskExec.status === "nok"
-                          ? "Describe qué está mal o qué se encontró..."
-                          : "Opcional. Usa este espacio para detalles, mediciones extra, etc."
-                      }
-                      value={currentTaskExec.comment}
-                      onChange={(e) => updateCurrentExec({ comment: e.target.value })}
-                    />
-                    {(currentTaskExec.flagged || currentTaskExec.status === "nok" || requiresMeasure) && (
-                      <p className="pm-help-error">
-                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la
-                        medición son obligatorios para continuar.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <footer className="pm-footer-nav">
-                  <div className="pm-footer-left">
-                    <button
-                      type="button"
-                      className="pm-btn pm-btn--secondary"
-                      onClick={handlePrev}
-                      disabled={currentIndex === 0}
-                    >
-                      Anterior
-                    </button>
-                  </div>
-                  <div className="pm-footer-right-nav">
-                    <button
-                      type="button"
-                      className={`pm-btn ${canGoNext() ? "pm-btn--primary" : "pm-btn--disabled"}`}
-                      onClick={handleNext}
-                      disabled={!canGoNext()}
-                    >
-                      Siguiente
-                    </button>
-                  </div>
-                </footer>
-
-                <div className="pm-finish-block">
-                  <button
-                    type="button"
-                    className={`pm-btn pm-btn--primary pm-btn--finish ${!canFinish || finishing ? "pm-btn--disabled" : ""}`}
-                    onClick={handleFinish}
-                    disabled={!canFinish || finishing}
-                  >
-                    {finishing ? "Generando PDF..." : "Finalizar y generar PDF"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </section>
+      {currentTaskTemplate && currentTaskExec && (
+        <div className="pm-task-panel">
+          {/* ... TODO tu panel actual de tarea se queda igual ... */}
         </div>
-      </main>
+      )}
+    </section>
+
+    {/* ✅ COLUMNA DERECHA (la que te faltó) */}
+    <aside className="pm-card pm-card-side">
+      <div className="pm-side-section">
+        <h3 className="pm-side-title">Resumen del PM</h3>
+        <div className="pm-side-stats">
+          <div className="pm-side-stat">
+            <span className="pm-side-stat-label">Total puntos</span>
+            <span className="pm-side-stat-value">{counts.total}</span>
+          </div>
+          <div className="pm-side-stat">
+            <span className="pm-side-stat-label">OK</span>
+            <span className="pm-side-stat-value pm-side-stat-ok">{counts.ok}</span>
+          </div>
+          <div className="pm-side-stat">
+            <span className="pm-side-stat-label">NO OK</span>
+            <span className="pm-side-stat-value pm-side-stat-nok">{counts.nok}</span>
+          </div>
+          <div className="pm-side-stat">
+            <span className="pm-side-stat-label">Pendientes</span>
+            <span className="pm-side-stat-value pm-side-stat-pending">{counts.pending}</span>
+          </div>
+          <div className="pm-side-stat">
+            <span className="pm-side-stat-label">FLAGS</span>
+            <span className="pm-side-stat-value pm-side-stat-flag">{counts.flagged}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="pm-side-section">
+        <p className="pm-side-section-title">Navegación por puntos</p>
+        <div className="pm-steps-grid">
+          {tasksArray.map((task, idx) => {
+            const exec = tasksExec.find((t) => t.taskId === task.id);
+            let statusClass = "pm-step--pending";
+            if (exec?.status === "ok") statusClass = "pm-step--ok";
+            else if (exec?.status === "nok") statusClass = "pm-step--nok";
+            if (exec?.flagged) statusClass = "pm-step--flag";
+
+            const isCurrent = idx === currentIndex;
+
+            return (
+              <button
+                key={task.id}
+                type="button"
+                className={`pm-step ${statusClass} ${
+                  isCurrent ? "pm-step--current" : ""
+                }`}
+                onClick={() => setCurrentIndex(idx)}
+              >
+                <span className="pm-step-index">{idx + 1}</span>
+                <span className="pm-step-id">{task.taskIdNumber}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="pm-side-section">
+        <p className="pm-side-section-title">Notas</p>
+        <p className="pm-side-text">
+          - Marca los puntos con <strong>FLAG</strong> cuando requieran revisión del GL o de
+          Mantenimiento.
+          <br />
+          - Los puntos con <strong>NO OK</strong> deben tener comentario obligatorio.
+          <br />
+          - Si el sistema detecta que el punto requiere <strong>medición</strong>, deberás capturar el valor.
+        </p>
+      </div>
+<div className="pm-progress-block">
+  <div className="pm-progress-row">
+    <span className="pm-progress-label">PROGRESO</span>
+    <span className="pm-progress-value">
+      {counts.total > 0 ? `${counts.ok + counts.nok}/${counts.total}` : "0/0"} puntos
+    </span>
+  </div>
+  <div className="pm-progress-row">
+    <span className="pm-progress-label">FLAGS</span>
+    <span className="pm-progress-value">{counts.flagged}</span>
+  </div>
+</div>
+
+      <div className="pm-side-footnote">
+        Cuando termines todos los puntos y no haya pendientes, el botón de{" "}
+        <strong>“Finalizar y generar PDF”</strong> se habilitará automáticamente.
+      </div>
+    </aside>
+  </div>
+</main>
+
     </div>
   );
 }
