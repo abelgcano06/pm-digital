@@ -1,302 +1,164 @@
-/* src/app/gl/gl.css */
-
-:root {
-  --bg: #f6f8fc;
-  --card: #ffffff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --line: #e6ebf5;
-
-  --blue-50: #eef5ff;
-  --blue-100: #dbeafe;
-  --blue-200: #bfdbfe;
-  --blue-600: #2563eb;
-
-  --green-50: #ecfdf5;
-  --green-600: #16a34a;
-
-  --amber-50: #fff7ed;
-  --amber-600: #d97706;
-
-  --gray-50: #f8fafc;
-  --gray-600: #475569;
-
-  --red-50: #fef2f2;
-  --red-600: #dc2626;
+.gl-page{
+  min-height:100vh;
+  background: linear-gradient(180deg, #f6f9ff 0%, #ffffff 60%);
+  color:#0b1b33;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
 
-.gl-page {
-  min-height: 100vh;
-  background: radial-gradient(1200px 500px at 20% 0%, var(--blue-50), transparent),
-              radial-gradient(900px 400px at 80% 0%, #f1f5ff, transparent),
-              var(--bg);
-  color: var(--text);
+.gl-shell{
+  max-width:1100px;
+  margin:0 auto;
+  padding:28px 18px 40px;
 }
 
-.gl-header {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 28px 18px 10px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
+.gl-shell--login{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding-top:60px;
 }
 
-.gl-chip {
-  display: inline-flex;
-  padding: 6px 10px;
-  background: var(--blue-50);
-  border: 1px solid var(--blue-100);
-  border-radius: 999px;
-  font-size: 12px;
-  color: #1e3a8a;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+.gl-card{
+  width:min(420px, 94vw);
+  background:#ffffff;
+  border:1px solid #e7eefc;
+  border-radius:16px;
+  padding:18px;
+  box-shadow: 0 10px 30px rgba(13, 60, 160, 0.08);
 }
 
-.gl-title {
-  margin: 10px 0 6px;
-  font-size: 28px;
-  font-weight: 800;
+.gl-title{ font-size:20px; font-weight:800; }
+.gl-subtitle{ margin-top:6px; opacity:.75; }
+
+.gl-form{ margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+.gl-label{ font-size:12px; opacity:.75; }
+
+.gl-input{
+  border:1px solid #d8e4ff;
+  border-radius:12px;
+  padding:10px 12px;
+  outline:none;
+  background:#fbfdff;
+}
+.gl-input:focus{ border-color:#8bb2ff; box-shadow:0 0 0 4px rgba(60, 120, 255, .12); }
+
+.gl-btn{
+  border-radius:12px;
+  padding:10px 12px;
+  border:1px solid transparent;
+  cursor:pointer;
+  font-weight:700;
 }
 
-.gl-subtitle {
-  margin: 0;
-  color: var(--muted);
-  max-width: 680px;
-  line-height: 1.35;
+.gl-btn--primary{
+  background:#2f6dff;
+  color:#fff;
+}
+.gl-btn--primary:disabled{ opacity:.55; cursor:not-allowed; }
+
+.gl-btn--secondary{
+  background:#eef4ff;
+  border-color:#d8e4ff;
+  color:#1744a6;
 }
 
-.gl-meta {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  color: var(--muted);
-  font-size: 13px;
+.gl-btn--ghost{
+  background:transparent;
+  border-color:#d8e4ff;
+  color:#1744a6;
 }
 
-.gl-meta-status {
-  color: var(--blue-600);
-  font-weight: 700;
+.gl-alert{
+  margin-top:12px;
+  border-radius:12px;
+  padding:10px 12px;
+  border:1px solid #ffd1d1;
+  background:#fff5f5;
+  color:#7a1f1f;
 }
 
-.gl-shell {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 10px 18px 40px;
+.gl-alert--error{ border-color:#ffcdcd; background:#fff3f3; }
+
+.gl-header{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-end;
+  margin-bottom:16px;
 }
 
-.gl-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  padding: 18px;
+.gl-chip{
+  display:inline-block;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.2px;
+  color:#1744a6;
+  background:#eef4ff;
+  border:1px solid #d8e4ff;
+  padding:6px 10px;
+  border-radius:999px;
 }
 
-.gl-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.gl-h1{ margin:10px 0 6px; font-size:26px; }
+.gl-p{ margin:0; opacity:.75; }
+
+.gl-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+
+.gl-list{ display:flex; flex-direction:column; gap:12px; margin-top:14px; }
+
+.gl-row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px;
+  border-radius:16px;
+  border:1px solid #e7eefc;
+  background:#ffffff;
+  box-shadow: 0 10px 24px rgba(13, 60, 160, 0.06);
 }
 
-.gl-card-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 800;
+.gl-row-title{ font-weight:900; font-size:16px; }
+.gl-row-meta{ margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+.gl-badge{
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:999px;
+  border:1px solid #d8e4ff;
+  background:#fbfdff;
+  color:#1744a6;
 }
 
-.gl-card-help {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 13px;
+.gl-badge--status{ font-weight:900; }
+.gl-badge--open{ background:#f2fff6; border-color:#bfeccc; color:#156a2d; }
+.gl-badge--completed{ background:#fff8e6; border-color:#ffe2a3; color:#7a5200; }
+.gl-badge--closed{ background:#eef4ff; border-color:#cfe0ff; color:#1744a6; }
+
+.gl-row-links{
+  margin-top:10px;
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
 }
 
-.gl-divider {
-  height: 1px;
-  background: var(--line);
-  margin: 16px 0;
+.gl-link{
+  font-size:13px;
+  color:#1744a6;
+  text-decoration:underline;
+}
+.gl-link--strong{ color:#0b3bff; font-weight:800; }
+.gl-link--muted{ font-size:13px; opacity:.6; }
+
+.gl-row-cta{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:160px;
 }
 
-.gl-filters {
-  display: grid;
-  grid-template-columns: 1.2fr 1.6fr 0.8fr;
-  gap: 12px;
-}
-
-@media (max-width: 900px) {
-  .gl-filters {
-    grid-template-columns: 1fr;
-  }
-}
-
-.gl-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.gl-label {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.gl-input {
-  border: 1px solid var(--line);
-  background: var(--gray-50);
-  border-radius: 12px;
-  padding: 10px 12px;
-  outline: none;
-  font-size: 14px;
-  color: var(--text);
-}
-
-.gl-input:focus {
-  border-color: var(--blue-200);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-  background: #fff;
-}
-
-.gl-alert {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-size: 13px;
-}
-
-.gl-alert-error {
-  background: var(--red-50);
-  border: 1px solid #fecaca;
-  color: #7f1d1d;
-}
-
-.gl-empty {
-  padding: 22px 12px;
-  color: var(--muted);
-  text-align: center;
-}
-
-.gl-table {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.gl-row {
-  display: grid;
-  grid-template-columns: 2.2fr 0.8fr 0.9fr 0.8fr 2.1fr;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 12px;
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 14px;
-}
-
-.gl-row-head {
-  background: var(--blue-50);
-  border-color: var(--blue-100);
-  font-size: 12px;
-  font-weight: 800;
-  color: #1e3a8a;
-}
-
-@media (max-width: 980px) {
-  .gl-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-}
-
-.gl-name {
-  font-weight: 800;
-  font-size: 14px;
-}
-
-.gl-sub {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.gl-col-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.gl-btn {
-  border-radius: 12px;
-  padding: 9px 12px;
-  font-size: 13px;
-  font-weight: 800;
-  border: 1px solid var(--line);
-  background: #fff;
-  cursor: pointer;
-}
-
-.gl-btn:hover {
-  filter: brightness(0.98);
-}
-
-.gl-btn-primary {
-  border-color: var(--blue-200);
-  background: linear-gradient(180deg, #ffffff, var(--blue-50));
-  color: #1e3a8a;
-}
-
-.gl-btn-secondary {
-  background: var(--gray-50);
-  color: var(--text);
-}
-
-.gl-btn-ghost {
-  background: #fff;
-  color: var(--text);
-}
-
-.gl-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 900;
-  border: 1px solid var(--line);
-  background: var(--gray-50);
-  color: var(--gray-600);
-}
-
-.tag-open {
-  background: var(--gray-50);
-  color: var(--gray-600);
-}
-
-.tag-completed {
-  background: var(--amber-50);
-  border-color: #fed7aa;
-  color: var(--amber-600);
-}
-
-.tag-closed {
-  background: var(--green-50);
-  border-color: #bbf7d0;
-  color: var(--green-600);
-}
-
-.tag-type {
-  background: var(--blue-50);
-  border-color: var(--blue-100);
-  color: #1e3a8a;
+.gl-empty{
+  padding:16px;
+  border-radius:16px;
+  border:1px dashed #d8e4ff;
+  background:#fbfdff;
+  color:#1744a6;
 }
