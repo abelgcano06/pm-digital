@@ -1,8 +1,7 @@
-// src/app/pm/[id]/page.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import "./pm-execution.css";
 
 type PMTaskTemplate = {
@@ -34,12 +33,12 @@ type TaskExecution = {
   comment: string;
   flagged: boolean;
   measureValue?: string;
-  // ✅ Fotos por tarea (URLs públicas en Vercel Blob)
   photoUrls: string[];
 };
 
 export default function PMExecutionPage({ params }: { params: { id: string } }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const asociado1 = searchParams.get("op1") || searchParams.get("a1") || "";
   const asociado2 = searchParams.get("op2") || searchParams.get("a2") || "";
@@ -55,6 +54,11 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
   const [finishedAt, setFinishedAt] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
 
+  // ✅ Confirmación visual cuando el PDF se generó bien
+  const [finishOk, setFinishOk] = useState(false);
+  const [finishPdfUrl, setFinishPdfUrl] = useState<string | null>(null);
+  const [finishExecutionId, setFinishExecutionId] = useState<string | null>(null);
+
   // Fotos
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -66,7 +70,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         setLoading(true);
         setError(null);
 
-        const res = await fetch(`/api/pm-templates/${params.id}`);
+        const res = await fetch(`/api/pm-templates/${params.id}`, { cache: "no-store" });
         if (!res.ok) throw new Error("Error al cargar el PM");
 
         const data: PMTemplate = await res.json();
@@ -201,11 +205,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         const fd = new FormData();
         fd.append("file", file);
 
-        const res = await fetch("/api/pm-photo", {
-          method: "POST",
-          body: fd,
-        });
-
+        const res = await fetch("/api/pm-photo", { method: "POST", body: fd });
         const data = await res.json().catch(() => ({} as any));
 
         if (!res.ok || !data?.ok || !data?.url) {
@@ -214,8 +214,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
           throw new Error(msg + details);
         }
 
-        // Ojo: usar el estado ACTUAL del currentTaskExec puede quedar stale si subes varias;
-        // por eso lo hacemos con setTasksExec basado en prev.
+        // 👇 Importante: usar el valor más nuevo (prev) para evitar race conditions
         setTasksExec((prev) =>
           prev.map((t) =>
             t.taskId === currentTaskTemplate.id
@@ -248,12 +247,10 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     if (!pmTemplate || tasksExec.length === 0) return false;
     if (counts.pending > 0) return false;
 
-    // NO OK => comentario obligatorio
     for (const t of tasksExec) {
       if (t.status === "nok" && !t.comment.trim()) return false;
     }
 
-    // Medición requerida
     for (const t of tasksExec) {
       const templateTask = (pmTemplate.tasks ?? []).find((x) => x.id === t.taskId);
       if (!templateTask) continue;
@@ -261,7 +258,6 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       if (needsMeasure && (!t.measureValue || !t.measureValue.trim())) return false;
     }
 
-    // FLAG => comentario obligatorio
     for (const t of tasksExec) {
       if (t.flagged && !t.comment.trim()) return false;
     }
@@ -289,7 +285,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         glNombre: glNombre || "SIN GL",
         startedAt: startedAt || now,
         finishedAt: now,
-        tasks: tasksExec, // ✅ incluye photoUrls (tu pm-finish debe soportarlo)
+        tasks: tasksExec, // incluye photoUrls
       };
 
       const res = await fetch("/api/pm-finish", {
@@ -298,18 +294,28 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         body: JSON.stringify(body),
       });
 
+      const data = await res.json().catch(() => ({} as any));
+
       if (!res.ok) {
-        const text = await res.text();
-        console.error("Error finish:", text);
-        throw new Error("Error al generar el PDF.");
+        const msg = data?.error || "Error al generar el PDF.";
+        const details = data?.details ? `\n${data.details}` : "";
+        throw new Error(msg + details);
       }
 
-      const data = await res.json();
       if (!data?.url) throw new Error("La respuesta no incluye la URL del PDF.");
 
-      // ✅ en iPhone/iPad a veces bloquea window.open si no es inmediato;
-      // pero como ya te está jalando el PDF, dejamos esto igual (NO lo toco).
-      window.open(data.url, "_blank");
+      // ✅ Confirmación visible (independiente de que iOS abra la pestaña)
+      setFinishOk(true);
+      setFinishPdfUrl(data.url);
+      setFinishExecutionId(data.executionId ?? null);
+
+      // En desktop puede abrir, pero en iOS a veces se bloquea.
+      // Lo dejamos opcional: si abre, bien; si no, el usuario tiene el link.
+      try {
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } catch {
+        // iOS puede bloquearlo; no pasa nada.
+      }
     } catch (e: any) {
       console.error(e);
       setError(e?.message || "No se pudo generar el PDF. Intenta de nuevo.");
@@ -330,6 +336,86 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="pm-page">
+      {/* ✅ MODAL/CONFIRMACIÓN */}
+      {finishOk && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: "min(520px, 100%)",
+              background: "#fff",
+              borderRadius: 16,
+              padding: 16,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>
+              ✅ PM terminado correctamente, gracias por hacer tu trabajo con Seguridad y Calidad
+            </div>
+            <div style={{ opacity: 0.85, marginBottom: 12 }}>
+              Tu ejecución se guardó en el sistema y el PDF de cierre se generó sin errores.
+              {finishExecutionId ? (
+                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
+                  Folio ejecución: <strong>{finishExecutionId}</strong>
+                </div>
+              ) : null}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {finishPdfUrl && (
+                <a
+                  href={finishPdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="pm-btn pm-btn--primary"
+                  style={{ textDecoration: "none" }}
+                >
+                  Abrir PDF de cierre
+                </a>
+              )}
+
+              <button
+                type="button"
+                className="pm-btn pm-btn--secondary"
+                onClick={() => {
+                  // Cierra el modal
+                  setFinishOk(false);
+                }}
+              >
+                Cerrar
+              </button>
+
+              <button
+                type="button"
+                className="pm-btn pm-btn--secondary"
+                onClick={() => {
+                  // Regresar a selección de PMs
+                  router.push("/pm");
+                }}
+              >
+                Volver a lista
+              </button>
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
+              Nota: En iPhone/iPad, algunas veces el navegador bloquea abrir una pestaña automática.
+              Por eso te dejamos el botón “Abrir PDF de cierre”.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* HEADER CON DETALLE DEL PM */}
       <header className="pm-header">
         <div className="pm-header-inner">
           <div className="pm-header-left">
@@ -348,11 +434,17 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   : "Ejecución de mantenimiento preventivo"}
               </p>
               <div className="pm-badges-row">
-                <span className="pm-badge pm-badge-chip">Asociado 1: {asociado1 || "SIN NOMBRE"}</span>
+                <span className="pm-badge pm-badge-chip">
+                  Asociado 1: {asociado1 || "SIN NOMBRE"}
+                </span>
                 {asociado2 && (
-                  <span className="pm-badge pm-badge-chip">Asociado 2: {asociado2}</span>
+                  <span className="pm-badge pm-badge-chip">
+                    Asociado 2: {asociado2}
+                  </span>
                 )}
-                <span className="pm-badge pm-badge-chip">GL: {glNombre || "SIN GL"}</span>
+                <span className="pm-badge pm-badge-chip">
+                  GL: {glNombre || "SIN GL"}
+                </span>
               </div>
             </div>
           </div>
@@ -361,12 +453,12 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
 
       <main className="pm-main">
         <div className="pm-main-inner">
-          {/* COLUMNA IZQUIERDA */}
           <section className="pm-card pm-card-main">
             {error && <div className="pm-error-banner">{error}</div>}
 
             {currentTaskTemplate && currentTaskExec && (
               <div className="pm-task-panel">
+                {/* Encabezado */}
                 <div className="pm-task-header">
                   <div className="pm-task-title-block">
                     <span className="pm-task-index">{currentIndex + 1}</span>
@@ -387,6 +479,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   </div>
                 </div>
 
+                {/* Info */}
                 <div className="pm-info-box">
                   <div className="pm-info-section">
                     <p className="pm-info-label">Key points</p>
@@ -414,6 +507,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   )}
                 </div>
 
+                {/* Controls */}
                 <div className="pm-controls-box">
                   <div className="pm-control-row">
                     <p className="pm-control-label">Resultado de este punto</p>
@@ -455,7 +549,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     </div>
                   )}
 
-                  {/* ✅ BLOQUE FOTOS */}
+                  {/* Fotos */}
                   <div className="pm-comments-block">
                     <span className="pm-comments-label">Evidencia (fotos)</span>
 
@@ -463,7 +557,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="image/jpeg,image/png"
+                        accept="image/jpeg,image/png,image/heic,image/heif"
                         capture="environment"
                         multiple
                         onChange={(e) => uploadPhotos(e.target.files)}
@@ -540,13 +634,13 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     />
                     {(currentTaskExec.flagged || currentTaskExec.status === "nok" || requiresMeasure) && (
                       <p className="pm-help-error">
-                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la
-                        medición son obligatorios para continuar.
+                        * Si el punto es NO OK, tiene FLAG o requiere medición, el comentario y/o la medición son obligatorios para continuar.
                       </p>
                     )}
                   </div>
                 </div>
 
+                {/* Nav */}
                 <footer className="pm-footer-nav">
                   <div className="pm-footer-left">
                     <button
@@ -570,7 +664,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   </div>
                 </footer>
 
-                {/* ✅ BLOQUE PROGRESO (el que extrañabas) */}
+                {/* Progress */}
                 <div className="pm-progress-block">
                   <div className="pm-progress-row">
                     <span className="pm-progress-label">PROGRESO</span>
@@ -584,18 +678,16 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   </div>
                 </div>
 
+                {/* Finish */}
                 <div className="pm-finish-block">
                   <div className="pm-legend">
                     <span>OK: punto correcto</span>
                     <span>NO OK: punto con desviación</span>
                     <span>FLAG: requiere revisión del GL / Mtto</span>
                   </div>
-
                   <button
                     type="button"
-                    className={`pm-btn pm-btn--primary pm-btn--finish ${
-                      !canFinish || finishing ? "pm-btn--disabled" : ""
-                    }`}
+                    className={`pm-btn pm-btn--primary pm-btn--finish ${!canFinish || finishing ? "pm-btn--disabled" : ""}`}
                     onClick={handleFinish}
                     disabled={!canFinish || finishing}
                   >
@@ -606,7 +698,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
             )}
           </section>
 
-          {/* ✅ COLUMNA DERECHA: RESUMEN / NAVEGACIÓN POR PASOS */}
+          {/* Lado derecho */}
           <aside className="pm-card pm-card-side">
             <div className="pm-side-section">
               <h3 className="pm-side-title">Resumen del PM</h3>
@@ -664,12 +756,10 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
             <div className="pm-side-section">
               <p className="pm-side-section-title">Notas</p>
               <p className="pm-side-text">
-                - Marca los puntos con <strong>FLAG</strong> cuando requieran revisión del GL o de
-                Mantenimiento.
+                - Marca los puntos con <strong>FLAG</strong> cuando requieran revisión del GL o de Mantenimiento.
                 <br />
                 - Los puntos con <strong>NO OK</strong> deben tener comentario obligatorio.
-                <br />
-                - Si el sistema detecta que el punto requiere <strong>medición</strong>, deberás capturar el valor.
+                <br />- Si el sistema detecta que el punto requiere <strong>medición</strong>, deberás capturar el valor.
               </p>
             </div>
 
