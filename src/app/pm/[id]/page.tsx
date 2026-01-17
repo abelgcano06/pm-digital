@@ -491,20 +491,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     <p className="pm-info-text">{currentTaskTemplate.reason || "-"}</p>
                   </div>
 
-                  {pdfUrl && (
-                    <div className="pm-info-section pm-info-section--pdf">
-                      <p className="pm-info-text">
-                        Si necesitas ver la imagen o esquema original, abre el PDF del PM.
-                      </p>
-                      <button
-                        type="button"
-                        className="pm-btn pm-btn--secondary"
-                        onClick={() => window.open(pdfUrl, "_blank")}
-                      >
-                        Ver PDF original
-                      </button>
-                    </div>
-                  )}
+                  
                 </div>
 
                 {/* Controls */}
@@ -549,67 +536,82 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                     </div>
                   )}
 
-                  {/* Fotos */}
-                  <div className="pm-comments-block">
-                    <span className="pm-comments-label">Evidencia (fotos)</span>
+                  {/* ✅ BLOQUE FOTOS */}
+<div className="pm-comments-block">
+  <span className="pm-comments-label">Evidencia (fotos)</span>
 
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/heic,image/heif"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => uploadPhotos(e.target.files)}
-                        disabled={uploadingPhoto}
-                        style={{ display: "none" }}
-                      />
+  <div
+    className="pm-evidence-row"
+    style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}
+  >
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept="image/jpeg,image/png"
+      capture="environment"
+      multiple
+      onChange={(e) => uploadPhotos(e.target.files)}
+      disabled={uploadingPhoto}
+      style={{ display: "none" }}
+    />
 
-                      <button
-                        type="button"
-                        className={`pm-btn ${uploadingPhoto ? "pm-btn--disabled" : "pm-btn--secondary"}`}
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploadingPhoto}
-                      >
-                        {uploadingPhoto ? "Subiendo..." : "Tomar / Subir foto"}
-                      </button>
-                    </div>
+    <button
+      type="button"
+      className={`pm-btn ${uploadingPhoto ? "pm-btn--disabled" : "pm-btn--secondary"}`}
+      onClick={() => fileInputRef.current?.click()}
+      disabled={uploadingPhoto}
+    >
+      {uploadingPhoto ? "Subiendo..." : "Tomar / Subir foto"}
+    </button>
 
-                    {photoError && (
-                      <div className="pm-error-banner" style={{ marginTop: 8 }}>
-                        {photoError}
-                      </div>
-                    )}
+    {/* ✅ NUEVO: botón ver PDF original aquí */}
+    {pdfUrl && (
+      <button
+        type="button"
+        className="pm-btn pm-btn--secondary"
+        onClick={() => window.open(pdfUrl, "_blank")}
+      >
+        Ver PDF original
+      </button>
+    )}
+  </div>
 
-                    {(currentTaskExec.photoUrls || []).length > 0 && (
-                      <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {currentTaskExec.photoUrls.map((url) => (
-                          <div key={url} style={{ width: 120 }}>
-                            <a href={url} target="_blank" rel="noreferrer">
-                              <img
-                                src={url}
-                                alt="Evidencia"
-                                style={{
-                                  width: "120px",
-                                  height: "90px",
-                                  objectFit: "cover",
-                                  borderRadius: 10,
-                                }}
-                              />
-                            </a>
-                            <button
-                              type="button"
-                              className="pm-btn pm-btn--ghost"
-                              style={{ width: "100%", marginTop: 6 }}
-                              onClick={() => removePhoto(url)}
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+  {photoError && (
+    <div className="pm-error-banner" style={{ marginTop: 8 }}>
+      {photoError}
+    </div>
+  )}
+
+  {(currentTaskExec.photoUrls || []).length > 0 && (
+    <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+      {currentTaskExec.photoUrls.map((url) => (
+        <div key={url} style={{ width: 120 }}>
+          <a href={url} target="_blank" rel="noreferrer">
+            <img
+              src={url}
+              alt="Evidencia"
+              style={{
+                width: "120px",
+                height: "90px",
+                objectFit: "cover",
+                borderRadius: 10,
+              }}
+            />
+          </a>
+          <button
+            type="button"
+            className="pm-btn pm-btn--ghost"
+            style={{ width: "100%", marginTop: 6 }}
+            onClick={() => removePhoto(url)}
+          >
+            Quitar
+          </button>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
 
                   {/* Comentarios */}
                   <div className="pm-comments-block">

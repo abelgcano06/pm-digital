@@ -738,3 +738,16 @@
 .pm-task-panel {
   overflow: visible;
 }
+.pm-evidence-row .pm-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .pm-evidence-row {
+    gap: 8px !important;
+  }
+  .pm-evidence-row .pm-btn {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+}
