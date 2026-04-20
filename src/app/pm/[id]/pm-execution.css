@@ -406,13 +406,15 @@
 .pm-info-section--kp {
   background: var(--kp-bg);
   border-left: 3px solid var(--red);
-  height: 68px;
+  min-height: 52px;
+  max-height: 110px;
 }
 
 .pm-info-section--reason {
   background: var(--reason-bg);
   border-left: 3px solid var(--orange);
-  height: 54px;
+  min-height: 44px;
+  max-height: 90px;
 }
 
 .pm-info-label {
@@ -906,9 +908,9 @@
     text-align: center;
   }
 
-  /* Área info: alturas fijas iguales en mobile */
-  .pm-info-section--kp     { height: 68px; }
-  .pm-info-section--reason { height: 54px; }
+  /* Área info en mobile */
+  .pm-info-section--kp     { max-height: 90px; }
+  .pm-info-section--reason { max-height: 80px; }
 
   /* Textarea un poco más alto en mobile */
   .pm-textarea { min-height: 72px; }

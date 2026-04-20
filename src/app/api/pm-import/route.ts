@@ -26,7 +26,10 @@ type ParsedPM = {
 const SYSTEM_PROMPT = `
 Eres un experto en interpretar PMs (mantenimiento preventivo) de Toyota.
 
-A partir del TEXTO PLANO extraído de un PDF de PM, devuelve ÚNICAMENTE un JSON válido:
+El PDF tiene una tabla con estas columnas exactas:
+  "Task ID" | "Major Steps" | "Key Points" | "Reason / Conditions" | "Measurement Point" | "Value"
+
+A partir del TEXTO PLANO extraído del PDF, devuelve UNICAMENTE un JSON valido:
 {
   "pmNumber": "string",
   "name": "string",
@@ -44,11 +47,15 @@ A partir del TEXTO PLANO extraído de un PDF de PM, devuelve ÚNICAMENTE un JSON
   ]
 }
 
-REGLAS:
-- "taskIdNumber" es el número real de tarea (ej. 110, 120, 152...).
-- "hasImage": true SÓLO si había ilustración/foto en esa fila; si no estás seguro, false.
-- "pdfPage": el número de página del PDF donde aparece esta tarea. El texto incluye marcas de página como "3:07 PM 2 / 7" (significa página 2). Usa ese número. Si no puedes determinarlo con certeza, usa 1.
-- NO inventes tareas. Responde SÓLO con el JSON, sin texto ni markdown adicional.
+MAPEO DE COLUMNAS:
+- "taskIdNumber" <- columna "Task ID" (numero entero, ej. 10, 20, 30...)
+- "majorStep"    <- columna "Major Steps" (que hacer)
+- "keyPoints"    <- columna "Key Points" (como hacerlo, pasos detallados)
+- "reason"       <- columna "Reason / Conditions" (por que hacerlo / condicion esperada). SIEMPRE extrae este campo; nunca lo dejes vacio si aparece texto en esa columna.
+- "hasImage"     <- true si esa fila tenia una fotografia o ilustracion de referencia; false si no.
+- "pdfPage"      <- numero de pagina del PDF donde aparece la tarea. El texto tiene marcas como "3:07 PM 2 / 7" (= pagina 2). Si no puedes determinarlo usa 1.
+
+NO inventes tareas. Responde SOLO con el JSON, sin texto ni markdown adicional.
 `.trim();
 
 export async function POST(req: Request) {

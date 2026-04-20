@@ -511,7 +511,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                 </div>
 
                 {/* Imagen de referencia del PDF */}
-                {currentTaskTemplate.hasImage && currentTaskTemplate.pdfPage && pdfUrl && (
+                {currentTaskTemplate.hasImage && pdfUrl && (
                   <button
                     type="button"
                     className="pm-ref-image-btn"
@@ -834,7 +834,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       )}
 
       {/* Modal: imagen de referencia del PDF */}
-      {showRefImage && currentTaskTemplate?.pdfPage && pdfUrl && (
+      {showRefImage && currentTaskTemplate && pdfUrl && (
         <div className="pm-ref-overlay" onClick={() => setShowRefImage(false)}>
           <div className="pm-ref-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="pm-ref-header">
@@ -843,7 +843,11 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
             </div>
             <iframe
               className="pm-ref-iframe"
-              src={`${pdfUrl}#page=${currentTaskTemplate.pdfPage}&toolbar=0&navpanes=0`}
+              src={
+                currentTaskTemplate.pdfPage
+                  ? `${pdfUrl}#page=${currentTaskTemplate.pdfPage}&toolbar=0&navpanes=0`
+                  : `${pdfUrl}#toolbar=0&navpanes=0`
+              }
               title="Imagen de referencia"
             />
           </div>

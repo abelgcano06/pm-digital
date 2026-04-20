@@ -1,4 +1,4 @@
-// Migración: extrae pdfPage para templates ya importados
+// Migración: extrae pdfPage + corrige reason/hasImage para templates ya importados
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { anthropic, extractJson } from "@/lib/anthropic";
@@ -9,17 +9,28 @@ export const runtime = "nodejs";
 const SYSTEM_PROMPT = `
 Eres un experto en interpretar PMs de Toyota.
 
-A partir del TEXTO PLANO extraído de un PDF de PM, devuelve ÚNICAMENTE un JSON válido con el número de página de cada tarea:
+El PDF tiene una tabla con estas columnas exactas:
+  "Task ID" | "Major Steps" | "Key Points" | "Reason / Conditions" | "Measurement Point" | "Value"
+
+A partir del TEXTO PLANO extraido del PDF, devuelve UNICAMENTE un JSON valido:
 {
   "tasks": [
-    { "taskIdNumber": number, "pdfPage": number }
+    {
+      "taskIdNumber": number,
+      "reason": "string",
+      "hasImage": boolean,
+      "pdfPage": number
+    }
   ]
 }
 
-El texto incluye marcas de página como "3:07 PM 2 / 7" (significa página 2 de 7).
-Usa esas marcas para determinar en qué página aparece cada tarea identificada por su taskIdNumber.
-Si no puedes determinar la página con certeza, usa 1.
-Responde SÓLO con el JSON, sin texto ni markdown adicional.
+MAPEO:
+- "taskIdNumber" <- columna "Task ID"
+- "reason"       <- columna "Reason / Conditions". SIEMPRE extrae este texto; nunca vacio.
+- "hasImage"     <- true si esa fila tenia fotografia o ilustracion de referencia.
+- "pdfPage"      <- numero de pagina donde aparece la tarea. Marcas en el texto: "3:07 PM 2 / 7" = pagina 2. Si no puedes determinarlo usa 1.
+
+Responde SOLO con el JSON, sin texto ni markdown adicional.
 `.trim();
 
 export async function POST(req: Request) {
@@ -30,10 +41,7 @@ export async function POST(req: Request) {
 
     const templates = await prisma.pMTemplate.findMany({
       where,
-      include: {
-        tasks: true,
-        uploadedFile: true,
-      },
+      include: { tasks: true, uploadedFile: true },
     });
 
     if (templates.length === 0) {
@@ -57,7 +65,7 @@ export async function POST(req: Request) {
 
         const message = await anthropic.messages.create({
           model: "claude-haiku-4-5-20251001",
-          max_tokens: 2048,
+          max_tokens: 4096,
           system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
           messages: [{
             role: "user",
@@ -68,15 +76,21 @@ export async function POST(req: Request) {
         const block = message.content[0];
         if (block.type !== "text") throw new Error("Respuesta inesperada de Claude");
 
-        const parsed = JSON.parse(extractJson(block.text)) as { tasks: { taskIdNumber: number; pdfPage: number }[] };
+        type ReparseTask = { taskIdNumber: number; reason?: string; hasImage?: boolean; pdfPage?: number };
+        const parsed = JSON.parse(extractJson(block.text)) as { tasks: ReparseTask[] };
 
         let updated = 0;
         for (const item of parsed.tasks) {
           const task = template.tasks.find((t) => t.taskIdNumber === item.taskIdNumber);
-          if (!task || !item.pdfPage) continue;
+          if (!task) continue;
+
           await prisma.pMTaskTemplate.update({
             where: { id: task.id },
-            data: { pdfPage: item.pdfPage },
+            data: {
+              ...(item.reason ? { reason: item.reason } : {}),
+              ...(typeof item.hasImage === "boolean" ? { hasImage: item.hasImage } : {}),
+              ...(item.pdfPage && item.pdfPage > 0 ? { pdfPage: item.pdfPage } : {}),
+            },
           });
           updated++;
         }
