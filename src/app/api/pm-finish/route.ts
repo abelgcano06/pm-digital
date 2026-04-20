@@ -22,6 +22,7 @@ type FinishBody = {
   pmName: string;
   asociado1: string;
   asociado2?: string;
+  asociado3?: string;
   glNombre: string;
   startedAt: string;
   finishedAt: string;
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
       pmName,
       asociado1,
       asociado2,
+      asociado3,
       glNombre,
       startedAt,
       finishedAt,
@@ -247,9 +249,7 @@ console.log("🧾 pm-finish payload:", {
       12
     );
     drawText(
-      `Equipo: ${sanitizeForPdf(asociado1)}${
-        asociado2 ? " y " + sanitizeForPdf(asociado2) : ""
-      } | GL: ${sanitizeForPdf(glNombre)}`,
+      `Equipo: ${sanitizeForPdf(asociado1)}${asociado2 ? ", " + sanitizeForPdf(asociado2) : ""}${asociado3 ? ", " + sanitizeForPdf(asociado3) : ""} | GL: ${sanitizeForPdf(glNombre)}`,
       10
     );
     drawText(

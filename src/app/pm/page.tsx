@@ -65,6 +65,7 @@ export default function PMSelectionPage() {
 
   const [operator1, setOperator1] = useState("");
   const [operator2, setOperator2] = useState("");
+  const [operator3, setOperator3] = useState("");
   const [groupLeader, setGroupLeader] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -126,8 +127,8 @@ export default function PMSelectionPage() {
       setStartError("Selecciona un PM de la lista.");
       return;
     }
-    if (!operator1.trim() || !groupLeader.trim()) {
-      setStartError("Debes capturar al menos Asociado 1 y GL.");
+    if (!operator1.trim() || !operator2.trim() || !groupLeader.trim()) {
+      setStartError("Debes capturar Asociado 1, Asociado 2 y GL.");
       return;
     }
 
@@ -179,13 +180,8 @@ export default function PMSelectionPage() {
         );
       }
 
-      router.push(
-        `/pm/${templateId}?op1=${encodeURIComponent(
-          operator1
-        )}&op2=${encodeURIComponent(
-          operator2
-        )}&gl=${encodeURIComponent(groupLeader)}`
-      );
+      const url = `/pm/${templateId}?op1=${encodeURIComponent(operator1)}&op2=${encodeURIComponent(operator2)}&gl=${encodeURIComponent(groupLeader)}${operator3.trim() ? `&op3=${encodeURIComponent(operator3)}` : ""}`;
+      router.push(url);
     } catch (err: any) {
       console.error("Error al iniciar PM:", err);
       setStartError(err?.message ?? "Error al iniciar PM, intenta de nuevo.");
@@ -204,7 +200,7 @@ export default function PMSelectionPage() {
   }).format(new Date());
 
   const startDisabled =
-    isStarting || !selectedPmId || !operator1.trim() || !groupLeader.trim();
+    isStarting || !selectedPmId || !operator1.trim() || !operator2.trim() || !groupLeader.trim();
 
   return (
     <div className="baja-pm-page">
@@ -257,12 +253,25 @@ export default function PMSelectionPage() {
               </div>
 
               <div className="baja-pm-input-group">
-                <label className="baja-pm-label">Asociado 2 (opcional)</label>
+                <label className="baja-pm-label">
+                  Asociado 2 <span className="baja-pm-label-required">*</span>
+                </label>
                 <input
                   type="text"
                   value={operator2}
                   onChange={(e) => setOperator2(e.target.value)}
                   placeholder="Nombre del asociado 2"
+                  className="baja-pm-input"
+                />
+              </div>
+
+              <div className="baja-pm-input-group">
+                <label className="baja-pm-label">Asociado 3 (opcional)</label>
+                <input
+                  type="text"
+                  value={operator3}
+                  onChange={(e) => setOperator3(e.target.value)}
+                  placeholder="Nombre del asociado 3"
                   className="baja-pm-input"
                 />
               </div>
@@ -300,8 +309,7 @@ export default function PMSelectionPage() {
               </button>
 
               <p className="baja-pm-footnote">
-                Debes seleccionar un PM de la lista y tener Asociado 1 y GL para
-                poder iniciar.
+                Campos con * son obligatorios. Asociado 3 es opcional.
               </p>
             </form>
           </section>
@@ -404,40 +412,41 @@ onChange={() => setSelectedPmId(pm.uploadedFileId || pm.id)}
                     />
 
                     <div className="baja-pm-list-main">
-                      <div className="baja-pm-list-name">{pm.fileName}</div>
+                      <div className="baja-pm-list-name">
+                        {pm.pmName || pm.fileName}
+                      </div>
 
-                      {/* ✅ GL y Tipo visibles */}
                       <div
                         style={{
                           display: "flex",
-                          gap: 8,
-                          marginTop: 6,
+                          gap: 6,
+                          marginTop: 5,
                           flexWrap: "wrap",
                         }}
                       >
-                        <span className="pm-badge pm-badge-chip">
-                          GL: {prettyGLOwner(pm.glOwner)}
-                        </span>
-                        <span className="pm-badge pm-badge-chip">
-                          Tipo: {prettyPMType(pm.pmType)}
-                        </span>
-                      </div>
-
-                      <div className="baja-pm-list-id" style={{ marginTop: 6 }}>
-                        ArchivoID: <span>{pm.id}</span>
-                        {pm.pmTemplateId ? (
-                          <>
-                            {" "}
-                            • TemplateID: <span>{pm.pmTemplateId}</span>
-                          </>
-                        ) : (
-                          <>
-                            {" "}
-                            •{" "}
-                            <span style={{ opacity: 0.8 }}>
-                              Sin template (se genera al iniciar)
-                            </span>
-                          </>
+                        {pm.glOwner && (
+                          <span className="pm-badge pm-badge-chip">
+                            👤 {prettyGLOwner(pm.glOwner)}
+                          </span>
+                        )}
+                        {pm.pmType && (
+                          <span className="pm-badge pm-badge-chip">
+                            {prettyPMType(pm.pmType)}
+                          </span>
+                        )}
+                        {!pm.pmTemplateId && (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "#f59e0b",
+                              background: "#fef3c7",
+                              border: "1px solid #fcd34d",
+                              borderRadius: 999,
+                              padding: "1px 7px",
+                            }}
+                          >
+                            ⚡ Se procesa al iniciar
+                          </span>
                         )}
                       </div>
                     </div>

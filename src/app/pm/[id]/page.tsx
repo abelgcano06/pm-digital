@@ -42,6 +42,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
 
   const asociado1 = searchParams.get("op1") || searchParams.get("a1") || "";
   const asociado2 = searchParams.get("op2") || searchParams.get("a2") || "";
+  const asociado3 = searchParams.get("op3") || "";
   const glNombre = searchParams.get("gl") || "";
 
   const [loading, setLoading] = useState(true);
@@ -282,6 +283,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         pmName: pmTemplate.name,
         asociado1: asociado1 || "SIN NOMBRE",
         asociado2: asociado2 || "",
+        asociado3: asociado3 || "",
         glNombre: glNombre || "SIN GL",
         startedAt: startedAt || now,
         finishedAt: now,
@@ -440,6 +442,11 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                 {asociado2 && (
                   <span className="pm-badge pm-badge-chip">
                     Asociado 2: {asociado2}
+                  </span>
+                )}
+                {asociado3 && (
+                  <span className="pm-badge pm-badge-chip">
+                    Asociado 3: {asociado3}
                   </span>
                 )}
                 <span className="pm-badge pm-badge-chip">
