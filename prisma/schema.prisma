@@ -77,6 +77,8 @@ model PMTaskTemplate {
 
   // Indicador de que este punto hace referencia a una imagen
   hasImage Boolean @default(false)
+  // Página del PDF donde aparece esta tarea (para mostrar imagen de referencia)
+  pdfPage  Int?
 
   pmTemplateId String
   pmTemplate   PMTemplate @relation(fields: [pmTemplateId], references: [id])

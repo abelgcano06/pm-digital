@@ -12,6 +12,7 @@ type PMTaskTemplate = {
   reason: string;
   order: number;
   hasImage?: boolean;
+  pdfPage?: number | null;
 };
 
 type PMTemplate = {
@@ -59,6 +60,9 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
   const [finishOk, setFinishOk] = useState(false);
   const [finishPdfUrl, setFinishPdfUrl] = useState<string | null>(null);
   const [finishExecutionId, setFinishExecutionId] = useState<string | null>(null);
+
+  // Modal imagen de referencia del PDF
+  const [showRefImage, setShowRefImage] = useState(false);
 
   // Fotos
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -506,6 +510,17 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                   </div>
                 </div>
 
+                {/* Imagen de referencia del PDF */}
+                {currentTaskTemplate.hasImage && currentTaskTemplate.pdfPage && pdfUrl && (
+                  <button
+                    type="button"
+                    className="pm-ref-image-btn"
+                    onClick={() => setShowRefImage(true)}
+                  >
+                    🖼 Ver imagen de referencia
+                  </button>
+                )}
+
                 {/* Controls */}
                 <div className="pm-controls-box">
                   <div className="pm-control-row">
@@ -815,6 +830,23 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
               {finishing ? "Generando..." : "Finalizar PM"}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Modal: imagen de referencia del PDF */}
+      {showRefImage && currentTaskTemplate?.pdfPage && pdfUrl && (
+        <div className="pm-ref-overlay" onClick={() => setShowRefImage(false)}>
+          <div className="pm-ref-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="pm-ref-header">
+              <span className="pm-ref-title">Imagen de referencia — Tarea {currentTaskTemplate.taskIdNumber}</span>
+              <button type="button" className="pm-ref-close" onClick={() => setShowRefImage(false)}>✕</button>
+            </div>
+            <iframe
+              className="pm-ref-iframe"
+              src={`${pdfUrl}#page=${currentTaskTemplate.pdfPage}&toolbar=0&navpanes=0`}
+              title="Imagen de referencia"
+            />
+          </div>
         </div>
       )}
     </div>

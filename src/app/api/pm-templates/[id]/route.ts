@@ -84,6 +84,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
           reason: t.reason,
           order: t.order,
           hasImage: (t as any).hasImage ?? false,
+          pdfPage: (t as any).pdfPage ?? null,
         })),
     };
 

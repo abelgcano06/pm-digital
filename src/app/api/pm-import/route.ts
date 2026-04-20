@@ -12,6 +12,7 @@ type ParsedTask = {
   keyPoints: string;
   reason: string;
   hasImage?: boolean;
+  pdfPage?: number;
 };
 
 type ParsedPM = {
@@ -37,7 +38,8 @@ A partir del TEXTO PLANO extraído de un PDF de PM, devuelve ÚNICAMENTE un JSON
       "majorStep": "string",
       "keyPoints": "string",
       "reason": "string",
-      "hasImage": boolean
+      "hasImage": boolean,
+      "pdfPage": number
     }
   ]
 }
@@ -45,6 +47,7 @@ A partir del TEXTO PLANO extraído de un PDF de PM, devuelve ÚNICAMENTE un JSON
 REGLAS:
 - "taskIdNumber" es el número real de tarea (ej. 110, 120, 152...).
 - "hasImage": true SÓLO si había ilustración/foto en esa fila; si no estás seguro, false.
+- "pdfPage": el número de página del PDF donde aparece esta tarea. El texto incluye marcas de página como "3:07 PM 2 / 7" (significa página 2). Usa ese número. Si no puedes determinarlo con certeza, usa 1.
 - NO inventes tareas. Responde SÓLO con el JSON, sin texto ni markdown adicional.
 `.trim();
 
@@ -110,6 +113,7 @@ export async function POST(req: Request) {
             reason: t.reason,
             order: t.order,
             hasImage: (t as any).hasImage ?? false,
+            pdfPage: (t as any).pdfPage ?? null,
           })),
       });
     }
@@ -172,6 +176,7 @@ export async function POST(req: Request) {
         reason: (t.reason || "").trim(),
         order: index + 1,
         hasImage: t.hasImage === true,
+        pdfPage: typeof t.pdfPage === "number" && t.pdfPage > 0 ? t.pdfPage : null,
       }));
 
     if (tasksClean.length === 0) throw new Error("No se pudieron extraer tareas del PM");
@@ -193,6 +198,7 @@ export async function POST(req: Request) {
             reason: t.reason,
             order: t.order,
             hasImage: t.hasImage,
+            pdfPage: t.pdfPage,
           })),
         },
       },
@@ -217,6 +223,7 @@ export async function POST(req: Request) {
           reason: t.reason,
           order: t.order,
           hasImage: (t as any).hasImage ?? false,
+          pdfPage: (t as any).pdfPage ?? null,
         })),
     });
   } catch (err: any) {
