@@ -58,6 +58,33 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [glFilter, setGlFilter] = useState<string>("all");
+  const [reparsingId, setReparsingId] = useState<string | null>(null);
+  const [reparseMsg, setReparseMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
+
+  // ── Re-parsear imágenes/razón de un PM ───────────────────────
+  const handleReparse = async (uploadedFileId: string) => {
+    setReparsingId(uploadedFileId);
+    setReparseMsg(null);
+    try {
+      const res = await fetch("/api/pm-reparse-pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadedFileId }),
+      });
+      const data = await res.json();
+      const updated = data?.results?.[0]?.updated ?? 0;
+      const err = data?.results?.[0]?.error;
+      setReparseMsg({
+        id: uploadedFileId,
+        ok: !err,
+        text: err ? `Error: ${err}` : `${updated} tareas actualizadas`,
+      });
+    } catch (e: any) {
+      setReparseMsg({ id: uploadedFileId, ok: false, text: e?.message || "Error" });
+    } finally {
+      setReparsingId(null);
+    }
+  };
 
   // ── Cargar lista ──────────────────────────────────────────────
   const fetchItems = async () => {
@@ -502,6 +529,20 @@ export default function AdminDashboardPage() {
                           <button type="button" className="btn btn-soft btn-xs" disabled={!canClose || isDeleted} onClick={() => canClose && !isDeleted && handleClosePm(item.id, pmStatus)}>
                             Cerrar PM
                           </button>
+                          <button
+                            type="button"
+                            className="btn btn-soft btn-xs"
+                            disabled={reparsingId === item.id}
+                            onClick={() => handleReparse(item.id)}
+                            title="Re-extraer razón e imágenes del PDF"
+                          >
+                            {reparsingId === item.id ? "..." : "Re-parsear"}
+                          </button>
+                          {reparseMsg?.id === item.id && (
+                            <span style={{ fontSize: 11, color: reparseMsg.ok ? "#3B6D11" : "#D8291F" }}>
+                              {reparseMsg.text}
+                            </span>
+                          )}
                           <button type="button" className="btn btn-danger btn-xs" disabled={isDeleted} onClick={() => handleDelete(item.id)}>
                             Eliminar
                           </button>

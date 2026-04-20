@@ -35,9 +35,13 @@ Responde SOLO con el JSON, sin texto ni markdown adicional.
 
 export async function POST(req: Request) {
   try {
-    const { templateId } = await req.json() as { templateId?: string };
+    const { templateId, uploadedFileId } = await req.json() as { templateId?: string; uploadedFileId?: string };
 
-    const where = templateId ? { id: templateId } : {};
+    const where = templateId
+      ? { id: templateId }
+      : uploadedFileId
+      ? { uploadedFileId }
+      : {};
 
     const templates = await prisma.pMTemplate.findMany({
       where,
