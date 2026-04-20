@@ -161,7 +161,18 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     );
   };
 
-  const handleSetStatus = (status: TaskStatus) => updateCurrentExec({ status });
+  const handleSetStatus = (status: TaskStatus) => {
+    updateCurrentExec({ status });
+    // Auto-avance al siguiente punto cuando se marca OK (sin medición ni flag pendiente)
+    if (
+      status === "ok" &&
+      !requiresMeasure &&
+      !currentTaskExec?.flagged &&
+      currentIndex < tasksArray.length - 1
+    ) {
+      setTimeout(() => setCurrentIndex((i) => i + 1), 350);
+    }
+  };
 
   const toggleFlag = () => {
     if (!currentTaskExec) return;
@@ -338,125 +349,126 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="pm-page">
-      {/* ✅ MODAL/CONFIRMACIÓN */}
+      {/* Modal: PM finalizado */}
       {finishOk && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            padding: 16,
-          }}
-        >
-          <div
-            style={{
-              width: "min(520px, 100%)",
-              background: "#fff",
-              borderRadius: 16,
-              padding: 16,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 8 }}>
-              ✅ PM terminado correctamente, gracias por hacer tu trabajo con Seguridad y Calidad
+        <div className="pm-modal-overlay">
+          <div className="pm-modal-sheet">
+            <div className="pm-modal-stripe">
+              <div className="pm-modal-stripe-r" />
+              <div className="pm-modal-stripe-o" />
+              <div className="pm-modal-stripe-y" />
             </div>
-            <div style={{ opacity: 0.85, marginBottom: 12 }}>
-              Tu ejecución se guardó en el sistema y el PDF de cierre se generó sin errores.
-              {finishExecutionId ? (
-                <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                  Folio ejecución: <strong>{finishExecutionId}</strong>
-                </div>
-              ) : null}
-            </div>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <h2 className="pm-modal-title">PM finalizado correctamente</h2>
+            <p className="pm-modal-body">
+              Tu ejecución se guardó y el PDF de cierre se generó sin errores.
+              Gracias por hacer tu trabajo con seguridad y calidad.
+            </p>
+            {finishExecutionId && (
+              <p className="pm-modal-folio">
+                Folio: <strong>{finishExecutionId}</strong>
+              </p>
+            )}
+            <div className="pm-modal-actions">
               {finishPdfUrl && (
                 <a
                   href={finishPdfUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="pm-btn pm-btn--primary"
+                  className="pm-btn pm-btn--finish"
                   style={{ textDecoration: "none" }}
                 >
                   Abrir PDF de cierre
                 </a>
               )}
-
               <button
                 type="button"
-                className="pm-btn pm-btn--secondary"
-                onClick={() => {
-                  // Cierra el modal
-                  setFinishOk(false);
-                }}
-              >
-                Cerrar
-              </button>
-
-              <button
-                type="button"
-                className="pm-btn pm-btn--secondary"
-                onClick={() => {
-                  // Regresar a selección de PMs
-                  router.push("/pm");
-                }}
+                className="pm-btn pm-btn--ghost"
+                onClick={() => router.push("/pm")}
               >
                 Volver a lista
               </button>
+              <button
+                type="button"
+                className="pm-btn pm-btn--ghost"
+                onClick={() => setFinishOk(false)}
+              >
+                Cerrar
+              </button>
             </div>
-
-            <div style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
-              Nota: En iPhone/iPad, algunas veces el navegador bloquea abrir una pestaña automática.
-              Por eso te dejamos el botón “Abrir PDF de cierre”.
-            </div>
+            <p className="pm-modal-note">
+              En iPhone/iPad el PDF puede no abrirse automáticamente — usa el botón de arriba.
+            </p>
           </div>
         </div>
       )}
 
-      {/* HEADER CON DETALLE DEL PM */}
-      <header className="pm-header">
-        <div className="pm-header-inner">
-          <div className="pm-header-left">
-            <div className="pm-header-icon">
-              <span>{pmTemplate.pmNumber || "PM"}</span>
-            </div>
-            <div className="pm-header-info">
-              <h1 className="pm-header-title">{pmTemplate.name}</h1>
-              <p className="pm-header-subtitle">
-                {pmTemplate.assetCode && pmTemplate.location
-                  ? `${pmTemplate.assetCode} · ${pmTemplate.location}`
-                  : pmTemplate.assetCode
-                  ? pmTemplate.assetCode
-                  : pmTemplate.location
-                  ? pmTemplate.location
-                  : "Ejecución de mantenimiento preventivo"}
-              </p>
-              <div className="pm-badges-row">
-                <span className="pm-badge pm-badge-chip">
-                  Asociado 1: {asociado1 || "SIN NOMBRE"}
-                </span>
-                {asociado2 && (
-                  <span className="pm-badge pm-badge-chip">
-                    Asociado 2: {asociado2}
-                  </span>
-                )}
-                {asociado3 && (
-                  <span className="pm-badge pm-badge-chip">
-                    Asociado 3: {asociado3}
-                  </span>
-                )}
-                <span className="pm-badge pm-badge-chip">
-                  GL: {glNombre || "SIN GL"}
-                </span>
+      {/* Bloque sticky: stripe + header + barra de progreso */}
+      <div className="pm-sticky-top">
+        <div className="pm-stripe">
+          <div className="pm-stripe-r" />
+          <div className="pm-stripe-o" />
+          <div className="pm-stripe-y" />
+        </div>
+
+        <header className="pm-header">
+          <div className="pm-header-inner">
+            <div className="pm-header-left">
+              <div className="pm-header-icon">
+                <span>{pmTemplate.pmNumber || "PM"}</span>
+              </div>
+              <div className="pm-header-info">
+                <h1 className="pm-header-title">{pmTemplate.name}</h1>
+                <p className="pm-header-subtitle">
+                  {pmTemplate.assetCode && pmTemplate.location
+                    ? `${pmTemplate.assetCode} · ${pmTemplate.location}`
+                    : pmTemplate.assetCode || pmTemplate.location || "Mantenimiento preventivo"}
+                </p>
+                <div className="pm-badges-row">
+                  <span className="pm-badge">A1: {asociado1 || "—"}</span>
+                  {asociado2 && <span className="pm-badge">A2: {asociado2}</span>}
+                  {asociado3 && <span className="pm-badge">A3: {asociado3}</span>}
+                  <span className="pm-badge">GL: {glNombre || "—"}</span>
+                </div>
               </div>
             </div>
+            {/* Badge de estado visible en mobile (sticky) */}
+            {currentTaskExec && (
+              <div className="pm-header-status">
+                <span className={`pm-task-status-badge pm-task-status-badge--${currentTaskExec.status}`}>
+                  {currentTaskExec.status === "ok" ? "OK" : currentTaskExec.status === "nok" ? "No ok" : "Pendiente"}
+                </span>
+                {currentTaskExec.flagged && <span className="pm-task-flag">Flag</span>}
+              </div>
+            )}
           </div>
-        </div>
-      </header>
+        </header>
+
+        {/* Barra de progreso segmentada */}
+        {totalTasks > 0 && (
+          <div className="pm-progress-wrap">
+            <div className="pm-progress-segs" role="group" aria-label="Progreso">
+              {tasksArray.map((task, idx) => {
+                const exec = tasksExec.find((t) => t.taskId === task.id);
+                let seg = "pm-seg";
+                if (idx === currentIndex) seg += " pm-seg--current";
+                else if (exec?.flagged) seg += " pm-seg--flag";
+                else if (exec?.status === "ok") seg += " pm-seg--ok";
+                else if (exec?.status === "nok") seg += " pm-seg--nok";
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className={seg}
+                    onClick={() => setCurrentIndex(idx)}
+                    aria-label={`Punto ${idx + 1}`}
+                  />
+                );
+              })}
+            </div>
+            <span className="pm-progress-counter">{currentIndex + 1} / {totalTasks}</span>
+          </div>
+        )}
+      </div>
 
       <main className="pm-main">
         <div className="pm-main-inner">
@@ -474,58 +486,51 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                       <h2 className="pm-task-title">{currentTaskTemplate.majorStep}</h2>
                     </div>
                   </div>
-                  <div className="pm-task-status-block">
+                  <div className="pm-task-status-block pm-card-status">
                     <span className={`pm-task-status-badge pm-task-status-badge--${currentTaskExec.status}`}>
-                      {currentTaskExec.status === "ok"
-                        ? "OK"
-                        : currentTaskExec.status === "nok"
-                        ? "NO OK"
-                        : "Pendiente"}
+                      {currentTaskExec.status === "ok" ? "OK" : currentTaskExec.status === "nok" ? "No ok" : "Pendiente"}
                     </span>
-                    {currentTaskExec.flagged && <span className="pm-task-flag">FLAG</span>}
+                    {currentTaskExec.flagged && <span className="pm-task-flag">Flag</span>}
                   </div>
                 </div>
 
-                {/* Info */}
+                {/* Info: Key Points / Razón */}
                 <div className="pm-info-box">
-                  <div className="pm-info-section">
-                    <p className="pm-info-label">Key points</p>
-                    <p className="pm-info-text">{currentTaskTemplate.keyPoints || "-"}</p>
+                  <div className="pm-info-section pm-info-section--kp">
+                    <span className="pm-info-label pm-info-label--kp">KEY POINTS</span>
+                    <p className="pm-info-text">{currentTaskTemplate.keyPoints || "—"}</p>
                   </div>
-
-                  <div className="pm-info-section pm-info-section--spaced">
-                    <p className="pm-info-label">Razón</p>
-                    <p className="pm-info-text">{currentTaskTemplate.reason || "-"}</p>
+                  <div className="pm-info-section pm-info-section--reason">
+                    <span className="pm-info-label pm-info-label--reason">RAZÓN</span>
+                    <p className="pm-info-text">{currentTaskTemplate.reason || "—"}</p>
                   </div>
-
-                  
                 </div>
 
                 {/* Controls */}
                 <div className="pm-controls-box">
                   <div className="pm-control-row">
-                    <p className="pm-control-label">Resultado de este punto</p>
+                    <span className="pm-control-label">RESULTADO</span>
                     <div className="pm-control-buttons">
                       <button
                         type="button"
-                        className={`pm-btn ${currentTaskExec.status === "ok" ? "pm-btn--primary" : "pm-btn--ghost"}`}
+                        className={`pm-btn-result${currentTaskExec.status === "ok" ? " pm-btn-result--ok" : ""}`}
                         onClick={() => handleSetStatus("ok")}
                       >
                         OK
                       </button>
                       <button
                         type="button"
-                        className={`pm-btn ${currentTaskExec.status === "nok" ? "pm-btn--danger" : "pm-btn--ghost"}`}
+                        className={`pm-btn-result${currentTaskExec.status === "nok" ? " pm-btn-result--nok" : ""}`}
                         onClick={() => handleSetStatus("nok")}
                       >
-                        NO OK
+                        No ok
                       </button>
                       <button
                         type="button"
-                        className={`pm-btn ${currentTaskExec.flagged ? "pm-btn--flag-active" : "pm-btn--ghost"}`}
+                        className={`pm-btn-result${currentTaskExec.flagged ? " pm-btn-result--flag" : ""}`}
                         onClick={toggleFlag}
                       >
-                        FLAG
+                        Flag
                       </button>
                     </div>
                   </div>
@@ -774,11 +779,44 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
 
             <div className="pm-side-footnote">
               Cuando termines todos los puntos y no haya pendientes, el botón de{" "}
-              <strong>“Finalizar y generar PDF”</strong> se habilitará automáticamente.
+              <strong>"Finalizar y generar PDF"</strong> se habilitará automáticamente.
             </div>
           </aside>
         </div>
       </main>
+
+      {/* Bottom bar mobile: Anterior / Siguiente / Finalizar */}
+      {currentTaskTemplate && currentTaskExec && (
+        <div className="pm-bottom-bar">
+          <button
+            type="button"
+            className="pm-btn-bottom pm-btn-bottom--prev"
+            onClick={handlePrev}
+            disabled={currentIndex === 0}
+          >
+            ← Ant.
+          </button>
+          {currentIndex < tasksArray.length - 1 ? (
+            <button
+              type="button"
+              className="pm-btn-bottom pm-btn-bottom--next"
+              onClick={handleNext}
+              disabled={!canGoNext()}
+            >
+              Siguiente →
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="pm-btn-bottom pm-btn-bottom--finish"
+              onClick={handleFinish}
+              disabled={!canFinish || finishing}
+            >
+              {finishing ? "Generando..." : "Finalizar PM"}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
