@@ -204,6 +204,11 @@ export default function PMSelectionPage() {
 
   return (
     <div className="baja-pm-page">
+      <div className="baja-pm-stripe">
+        <div className="baja-pm-stripe-r" />
+        <div className="baja-pm-stripe-o" />
+        <div className="baja-pm-stripe-y" />
+      </div>
       <div className="baja-pm-shell">
         <header className="baja-pm-header">
           <div className="baja-pm-header-main">
