@@ -1,24 +1,28 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
-  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
-  const session = request.cookies.get("admin_session")?.value;
+const PUBLIC_PATHS = ["/admin/login", "/api/admin/login"];
 
-  // Si entra a /admin/login no bloqueamos
-  if (request.nextUrl.pathname === "/admin/login") {
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (PUBLIC_PATHS.includes(pathname)) {
     return NextResponse.next();
   }
 
-  // Si entra a cualquier /admin/* sin sesión → login
-  if (isAdminRoute && session !== "true") {
-    const url = new URL("/admin/login", request.url);
-    return NextResponse.redirect(url);
+  const session = request.cookies.get("admin_session")?.value;
+  const isAuthenticated = session === "true";
+
+  if (!isAuthenticated) {
+    if (pathname.startsWith("/api/admin")) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin(.*)", "/api/admin(.*)"],
 };

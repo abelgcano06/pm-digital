@@ -3,35 +3,15 @@ import fs from "fs";
 import path from "path";
 
 import { prisma } from "../../../lib/prisma";
-import { openai } from "../../../lib/openai";
+import { anthropic, extractJson } from "../../../lib/anthropic";
 
-// reutilizamos pdf-parse igual que en /api/pm-import
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pdf = require("pdf-parse") as (data: Buffer) => Promise<any>;
 
-// Función que importa UN solo PDF (misma lógica que /api/pm-import)
-async function importOnePm(fileName: string) {
-  // 1. ¿ya existe en BD?
-  const existing = await prisma.pMTemplate.findFirst({
-    where: { pdfFileName: fileName },
-    include: { tasks: true },
-  });
+const SYSTEM_PROMPT = `
+Eres un asistente que extrae información estructurada de un PM de mantenimiento de Toyota.
 
-  if (existing && existing.tasks.length > 0) {
-    return existing;
-  }
-
-  // 2. Leer PDF
-  const filePath = path.join(process.cwd(), "public","pm-files", fileName);
-  const dataBuffer = fs.readFileSync(filePath);
-  const pdfData = await pdf(dataBuffer);
-  const text = pdfData.text;
-
-  // 3. Llamar a OpenAI para extraer estructura
-  const prompt = `
-Eres un asistente que extrae información estructurada de un PM de mantenimiento.
-
-Del siguiente texto de un PDF de PM de Toyota, genera un JSON con:
+Devuelve ÚNICAMENTE un JSON válido:
 {
   "pmNumber": string,
   "name": string,
@@ -47,52 +27,44 @@ Del siguiente texto de un PDF de PM de Toyota, genera un JSON con:
   ]
 }
 
-Importante:
-- "tasks" debe incluir cada fila de tareas (Task ID 10, 20, 30, ...).
-- Usa números enteros para taskIdNumber.
-- No inventes datos; si algo no está claro, deja null o vacío.
-
-Texto del PDF:
-"""${text}"""
+Reglas: incluye cada fila de tareas, usa enteros para taskIdNumber, no inventes datos. Responde SÓLO con el JSON.
 `.trim();
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
-    messages: [
-      {
-        role: "system",
-        content:
-          "Eres un asistente que extrae información estructurada de un PDF de PM de mantenimiento. Responde SIEMPRE con un JSON válido.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    response_format: { type: "json_object" },
+async function importOnePm(fileName: string) {
+  const existing = await prisma.pMTemplate.findFirst({
+    where: { pdfFileName: fileName },
+    include: { tasks: true },
   });
 
-  const raw = completion.choices[0].message.content;
+  if (existing && existing.tasks.length > 0) return existing;
 
-  if (!raw) {
-    throw new Error("OpenAI respondió sin contenido");
-  }
+  const filePath = path.join(process.cwd(), "public", "pm-files", fileName);
+  const dataBuffer = fs.readFileSync(filePath);
+  const pdfData = await pdf(dataBuffer);
 
-  let parsed: any;
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 4096,
+    system: [
+      {
+        type: "text",
+        text: SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" },
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: `Texto del PDF:\n"""\n${pdfData.text}\n"""`,
+      },
+    ],
+  });
 
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    const firstBrace = raw.indexOf("{");
-    const lastBrace = raw.lastIndexOf("}");
-    const jsonString =
-      firstBrace !== -1 && lastBrace !== -1
-        ? raw.slice(firstBrace, lastBrace + 1)
-        : raw;
-    parsed = JSON.parse(jsonString);
-  }
+  const block = message.content[0];
+  if (block.type !== "text") throw new Error("Respuesta inesperada de Claude");
 
-  // 4. Guardar en BD
+  const parsed = JSON.parse(extractJson(block.text));
+
   const pmTemplate = await prisma.pMTemplate.create({
     data: {
       pmNumber: parsed.pmNumber || fileName.replace(".pdf", ""),
@@ -116,21 +88,15 @@ Texto del PDF:
   return pmTemplate;
 }
 
-// Endpoint que recorre TODOS los PDFs
 export async function POST() {
   try {
-    const pmFolderPath = path.join(process.cwd(), "public","pm-files");
-
+    const pmFolderPath = path.join(process.cwd(), "public", "pm-files");
     const files = fs
       .readdirSync(pmFolderPath)
-      .filter((file) => file.toLowerCase().endsWith(".pdf"));
+      .filter((f) => f.toLowerCase().endsWith(".pdf"));
 
     if (files.length === 0) {
-      return NextResponse.json({
-        message: "No se encontraron archivos PDF en pm-files",
-        imported: [],
-        errors: [],
-      });
+      return NextResponse.json({ message: "No hay PDFs en pm-files", imported: [], errors: [] });
     }
 
     const imported: any[] = [];
@@ -138,32 +104,17 @@ export async function POST() {
 
     for (const fileName of files) {
       try {
-        console.log(`Importando: ${fileName}`);
         const tpl = await importOnePm(fileName);
-        imported.push({
-          fileName,
-          id: tpl.id,
-          pmNumber: tpl.pmNumber,
-          name: tpl.name,
-        });
+        imported.push({ fileName, id: tpl.id, pmNumber: tpl.pmNumber, name: tpl.name });
       } catch (e) {
-        console.error(`Error importando ${fileName}:`, e);
-        errors.push({
-          fileName,
-          error: String(e),
-        });
+        errors.push({ fileName, error: String(e) });
       }
     }
 
-    return NextResponse.json({
-      message: "Proceso completado",
-      imported,
-      errors,
-    });
+    return NextResponse.json({ message: "Proceso completado", imported, errors });
   } catch (error) {
-    console.error(error);
     return NextResponse.json(
-      { error: "Error procesando todos los PDFs", details: String(error) },
+      { error: "Error procesando PDFs", details: String(error) },
       { status: 500 }
     );
   }

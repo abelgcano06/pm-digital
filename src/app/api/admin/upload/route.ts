@@ -37,6 +37,13 @@ export async function POST(req: Request) {
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
 
+      if (buffer.length < 4 || buffer.toString("ascii", 0, 4) !== "%PDF") {
+        return NextResponse.json(
+          { ok: false, error: `El archivo "${file.name}" no es un PDF válido` },
+          { status: 400 }
+        );
+      }
+
       const blob = await put(file.name, buffer, {
         access: "public",
         addRandomSuffix: true,
