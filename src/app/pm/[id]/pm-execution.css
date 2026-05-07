@@ -1002,6 +1002,12 @@
   opacity: 0.8;
 }
 
+.pm-ref-image-btn--dim {
+  background: #F7F5F2;
+  border-color: var(--gray-d3);
+  color: var(--gray-60);
+}
+
 /* ─── Modal imagen de referencia ────────────────── */
 .pm-ref-overlay {
   position: fixed;

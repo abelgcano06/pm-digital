@@ -61,11 +61,9 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
   const [finishPdfUrl, setFinishPdfUrl] = useState<string | null>(null);
   const [finishExecutionId, setFinishExecutionId] = useState<string | null>(null);
 
-  // Modal imagen de referencia del PDF
-  const [showRefImage, setShowRefImage] = useState(false);
-
   // Fotos
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
@@ -245,6 +243,7 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
     }
   }
 
@@ -511,13 +510,18 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
                 </div>
 
                 {/* Imagen de referencia del PDF */}
-                {currentTaskTemplate.hasImage && pdfUrl && (
+                {pdfUrl && (
                   <button
                     type="button"
-                    className="pm-ref-image-btn"
-                    onClick={() => setShowRefImage(true)}
+                    className={`pm-ref-image-btn${currentTaskTemplate.hasImage ? "" : " pm-ref-image-btn--dim"}`}
+                    onClick={() => {
+                      const url = currentTaskTemplate.pdfPage
+                        ? `${pdfUrl}#page=${currentTaskTemplate.pdfPage}`
+                        : pdfUrl;
+                      window.open(url, "_blank");
+                    }}
                   >
-                    🖼 Ver imagen de referencia
+                    🖼 {currentTaskTemplate.hasImage ? "Ver imagen de referencia" : "Ver PDF de referencia"}
                   </button>
                 )}
 
@@ -581,6 +585,15 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       disabled={uploadingPhoto}
       style={{ display: "none" }}
     />
+    <input
+      ref={galleryInputRef}
+      type="file"
+      accept="image/jpeg,image/png"
+      multiple
+      onChange={(e) => uploadPhotos(e.target.files)}
+      disabled={uploadingPhoto}
+      style={{ display: "none" }}
+    />
 
     <button
       type="button"
@@ -588,7 +601,16 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
       onClick={() => fileInputRef.current?.click()}
       disabled={uploadingPhoto}
     >
-      {uploadingPhoto ? "Subiendo..." : "Tomar / Subir foto"}
+      {uploadingPhoto ? "Subiendo..." : "📷 Tomar foto"}
+    </button>
+
+    <button
+      type="button"
+      className={`pm-btn ${uploadingPhoto ? "pm-btn--disabled" : "pm-btn--secondary"}`}
+      onClick={() => galleryInputRef.current?.click()}
+      disabled={uploadingPhoto}
+    >
+      🖼 Galería
     </button>
 
     {/* ✅ NUEVO: botón ver PDF original aquí */}
@@ -833,26 +855,6 @@ export default function PMExecutionPage({ params }: { params: { id: string } }) 
         </div>
       )}
 
-      {/* Modal: imagen de referencia del PDF */}
-      {showRefImage && currentTaskTemplate && pdfUrl && (
-        <div className="pm-ref-overlay" onClick={() => setShowRefImage(false)}>
-          <div className="pm-ref-sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="pm-ref-header">
-              <span className="pm-ref-title">Imagen de referencia — Tarea {currentTaskTemplate.taskIdNumber}</span>
-              <button type="button" className="pm-ref-close" onClick={() => setShowRefImage(false)}>✕</button>
-            </div>
-            <iframe
-              className="pm-ref-iframe"
-              src={
-                currentTaskTemplate.pdfPage
-                  ? `${pdfUrl}#page=${currentTaskTemplate.pdfPage}&toolbar=0&navpanes=0`
-                  : `${pdfUrl}#toolbar=0&navpanes=0`
-              }
-              title="Imagen de referencia"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
