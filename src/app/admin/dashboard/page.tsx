@@ -46,7 +46,7 @@ const PM_TYPES = ["online", "offline", "pdm", "4s+s"];
 type StatusFilter = "open" | "completed" | "closed" | "all";
 
 export default function AdminDashboardPage() {
-  const [uploadedBy] = useState("Frida");
+  const [uploadedBy] = useState("Admin");
   const [defaultGl, setDefaultGl] = useState<string>(GL_OPTIONS[0]);
   const [defaultType, setDefaultType] = useState<string>("online");
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
@@ -268,7 +268,7 @@ export default function AdminDashboardPage() {
         {/* HEADER */}
         <header className="admin-header">
           <div>
-            <h1 className="admin-title">FRIDA · PMs Digitales</h1>
+            <h1 className="admin-title">ADMIN · PMs Digitales</h1>
             <p className="admin-subtitle">
               Panel de control · Carga por lotes · Asignación por GL · Historial
             </p>

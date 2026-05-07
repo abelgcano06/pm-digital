@@ -456,7 +456,7 @@ onChange={() => setSelectedPmId(pm.uploadedFileId || pm.id)}
                       </div>
                     </div>
 
-                    <div className="baja-pm-list-origin">Nube Frida</div>
+                    <div className="baja-pm-list-origin">Nube Admin</div>
                   </label>
                 ))}
               </div>
